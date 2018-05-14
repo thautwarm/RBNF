@@ -26,11 +26,10 @@ class Literal(traits.ConsInd, traits.Dense, traits.Im):
 
     C: RDT[lambda const_string: [[make_const_str_matcher(const_string)], f'C{const_string.__repr__()}']]
 
-    NC: RDT[lambda name, const_string: [
-            [make_name_and_const_str_matcher(name, const_string)],
-            f'<{name}>{const_string.__repr__()}']]
+    NC: RDT[lambda name, const_string: [[make_name_and_const_str_matcher(name, const_string)],
+        f'<{name}>{const_string.__repr__()}']]
 
-    Reverse: RDT[lambda literal: [[literal[1]], f'~{literal}']]
+    Invert: RDT[lambda literal: [[lambda token: not literal[1](token)], f'~{literal}']]
 
     def __str__(self):
         return str(self.__inst_str__)
@@ -45,10 +44,11 @@ class Literal(traits.ConsInd, traits.Dense, traits.Im):
             return Result(Matched, token)
         return Result(Unmatched, None)
 
+    def __invert__(self):
+        # noinspection PyCallingNonCallable
+        return Literal.Invert(self)
+
 
 class Atom:
     def __init__(self, ):
         pass
-
-
-
