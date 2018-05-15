@@ -27,8 +27,9 @@ class Result:
 
     def __str__(self):
         return {
-            Unmatched: lambda: Red("Unmatched"),
-            Matched: lambda: Green(str(self.value)),
-            FindLR: lambda: Blue(f"Find left recursion.")
+            Unmatched: lambda: Red("Unmatched"), Matched: lambda: Green(str(self.value)),
+            FindLR   : lambda: Blue(f"Find left recursion.")
         }[self.status]()
 
+
+unmatch = Result(Unmatched, None)

@@ -1,14 +1,38 @@
+from typing import Optional
+from Redy.Magic.Classic import singleton
 from .Trace import *
+
+
+@singleton
+class LRManager:
+    state: 'State'
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.state.lr_name = None
+
+
+LRManager: LRManager
 
 
 class State(Generic[T]):
     trace: Trace[Trace[T]]
     persistent_state: dict
+    lr_name: Optional[str]
+    lang: dict
 
-    def __init__(self):
+    def __init__(self, lang):
+        self.lang = lang
+        self.lr_name = None
         self.trace = Trace()
         current = self.current = Trace()
         self.trace.append(current)
+
+    def do_left_recursion(self):
+        LRManager.state = self
+        return LRManager
 
     @property
     def counted(self):
@@ -17,9 +41,11 @@ class State(Generic[T]):
     def new_one(self):
         trace = self.trace
         if trace.max_fetched > trace.len:
-            current = self.current = trace[trace.len]
+            idx = trace.len
+            trace.virtual_length += 1
+            current = self.current = trace[idx]
             current.clear()
-            current.virtual_length += 1
+
 
             return
         self.current = current = Trace()
@@ -34,6 +60,9 @@ class State(Generic[T]):
     def reset(self, history):
         base, branch = history
         return self.trace.reset(base), self.current.reset(branch)
+
+    def __contains__(self, item: T):
+        return item in self.current
 
     def __str__(self):
         return str(self.trace)

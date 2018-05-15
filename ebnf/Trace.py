@@ -43,9 +43,12 @@ class Trace(Sequence[T], Generic[T]):
         self.virtual_length = 0
 
     def __str__(self):
-        content = ', '.join(Green(str(each)) if i < self.virtual_length else Red(str(each)) for i, each in
-                            enumerate(self._records))
+        content = ', '.join(
+                Green(str(each)) if i < self.virtual_length else Red(str(each)) for i, each in enumerate(self._records))
         return f'[{content}]'
 
     def __repr__(self):
         return self.__str__()
+
+
+

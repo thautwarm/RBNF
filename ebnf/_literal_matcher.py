@@ -1,4 +1,5 @@
 from .Tokenizer import Tokenizer
+from .CachingPool import ConstStrPool
 import re
 
 
@@ -19,6 +20,8 @@ def make_runtime_str_matcher(runtime_str: str):
 
 
 def make_const_str_matcher(const_str: str):
+    const_str = ConstStrPool.cast_to_const(const_str)
+
     def match(token: Tokenizer):
         return token.value is const_str
 
@@ -26,6 +29,8 @@ def make_const_str_matcher(const_str: str):
 
 
 def make_name_matcher(name: str):
+    name = ConstStrPool.cast_to_const(name)
+
     def match(token: Tokenizer):
         return token.value is name
 
@@ -33,6 +38,9 @@ def make_name_matcher(name: str):
 
 
 def make_name_and_const_str_matcher(name: str, const_str: str):
+    name = ConstStrPool.cast_to_const(name)
+    const_str = ConstStrPool.cast_to_const(const_str)
+
     def match(token: Tokenizer):
         return token.value is const_str and token.name is name
 
