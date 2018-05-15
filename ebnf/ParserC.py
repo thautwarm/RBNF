@@ -23,6 +23,9 @@ class Parser:
     def __call__(self, least, most=-1) -> 'Parser':
         return Composed.Seq(self, least, most)
 
+    def __invert__(self):
+        return Composed.AnyNot(self)
+
     def __matmul__(self, other: str):
         return Atom.Bind(other, self)
 
