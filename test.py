@@ -1,6 +1,4 @@
-from ebnf.State import *
 from ebnf.ParserC import *
-from ebnf.CachingPool import *
 from Redy.Magic.Classic import cast
 C = Literal.C
 R = Literal.R
@@ -52,6 +50,6 @@ tokens = make_tokens("<", "my", ">",
                             "x", "y", "z",
                         "<", "/", "my", ">",
                      "<", "/", "my",">")
-context = {}
+context = Context()
 state = State(lang)
 print(xml.match(tokens, state, context))

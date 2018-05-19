@@ -4,11 +4,11 @@ from Redy.ADT.Core import RDT
 from .AST import *
 from .Result import *
 from .State import *
+from .Context import Context
 from ._literal_matcher import *
 from Redy.Magic.Pattern import Pattern
 from warnings import warn
 
-Context = dict
 LRFunc = Callable[[AST, Context], Result]
 When = Callable[[Sequence[Tokenizer], State], bool]
 With = Callable[[Sequence[Tokenizer], State, Context], bool]
@@ -19,6 +19,9 @@ class Parser:
 
     def match(self, tokenizers: Sequence[Tokenizer], state: State, context: Context) -> Result:
         raise NotImplemented
+
+    def repeat(self, least, most=-1) -> 'Parser':
+        return self(least, most)
 
     def __call__(self, least, most=-1) -> 'Parser':
         return Composed.Seq(self, least, most)
@@ -131,7 +134,7 @@ def _bind_match(self: Atom, tokenizers: Sequence[Tokenizer], state: State, conte
 
 @Atom.match.case(Atom.Named)
 def _named_match(self: Atom, tokenizers: Sequence[Tokenizer], state: State, context: Context):
-    context = {}
+    context = context.copy()
     _, name, when, with_, rewrite = self
     lang = state.lang
     when: When
@@ -213,6 +216,9 @@ class Composed(Parser, traits.ConsInd, traits.Dense, traits.Im):
     And: lambda atoms: " ".join(map(str, atoms))
     Or: lambda ands: " | ".join(map(str, ands))
     Seq: lambda parser, least, most: f'{parser}({least} {most})'
+    Jump: lambda switch_cases: "{{{}}}".format(
+            ', '.join(f"({case.__repr__()} => {parser})" for case, parser in switch_cases.items()))
+
     AnyNot: lambda which: f'not {which}'
 
     def __str__(self):
@@ -245,7 +251,6 @@ def _and_match(self: Composed, tokenizers: Sequence[Tokenizer], state: State, co
         atom = atoms[i]
 
         each_result = atom.match(tokenizers, state, context)
-
 
         if each_result.status is Unmatched:
             state.reset(history)
@@ -361,3 +366,23 @@ def _seq_match(self: Composed, tokenizers: Sequence[Tokenizer], state: State, co
                 return unmatch
 
         return Result(FindLR, stacked_func_)
+
+
+@Composed.match.case(Composed.Jump)
+def _jump_match(self: Composed, tokenizers: Sequence[Tokenizer], state: State, context: Context) -> Result:
+    parser_dict: Dict[str, Parser] = self[1]
+
+    try:
+        token = tokenizers[state.counted]
+    except IndexError:
+        return unmatch
+
+    parser = parser_dict.get(token.value)
+    if not parser:
+        return unmatch
+    history = state.commit()
+    state.new_one()
+    result = parser.match(tokenizers, state, context)
+    if result.status is Status.Unmatched:
+        state.reset(history)
+    return result
