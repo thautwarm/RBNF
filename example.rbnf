@@ -1,0 +1,49 @@
+:bootstrap
+
+import std.XML.*
+
+Atom ::=
+    | Name
+    | Str
+    | '(' Or ')'
+
+Trail ::=
+    | Atom ['+' | '*' | '{' Number{1, 2} '}']
+    | '~' Atom
+
+And   ::=
+    | Trail+
+
+Or    ::=
+    | And ('|' And)*
+
+Statement ::=
+    | 'ignore' '[' Name ']'
+    | 'import' Name ('.' ('*' | Name))*
+    | Name '::=' ['|']  Or [Clauses]
+    | Name ['cast'] ['as' Name] ':=' ['|'] Str+ [Clauses]
+
+Clauses ::=
+    [When] [With] [Where] [Rewrite]
+
+When ::= 'when' XML
+
+With ::= 'with' XML
+
+Rewrite ::= 'rewrite' XML
+
+Statements ::=
+    | Statement (END Statement)*
+
+
+
+:XML
+
+import std.Common.Name
+
+XML ::=
+    |'<' Name as _1 '>' (XML | Any)* '<' Name as _2 '/' '>'
+    |'<' Name '/' '>'
+
+
+

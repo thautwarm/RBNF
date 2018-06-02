@@ -17,8 +17,6 @@ class AST:
 
 
 class Nested(AST, List[AST]):
-    pass
-
     def format(self, i=0):
         return '\n'.join(format_ast(each, i + 1) for each in self)
 

@@ -32,7 +32,7 @@ def make_name_matcher(name: str):
     name = ConstStrPool.cast_to_const(name)
 
     def match(token: Tokenizer):
-        return token.value is name
+        return token.name is name
 
     return match
 
