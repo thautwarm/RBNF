@@ -4,7 +4,7 @@ StrLexerTable = List[Tuple[str, Callable[[str, int], str]]]
 
 _keyword = ConstStrPool.cast_to_const("keyword")
 
-_cast_map = set(map(ConstStrPool.cast_to_const, ["as", 'cast']))
+_cast_map = set(map(ConstStrPool.cast_to_const, ["as", 'cast', 'when', 'with', 'rewrite']))
 
 _lexer_table: List[Tuple[str, Callable[[str, int], str]]] = [
     ("auto_const" | ToConst, char_lexer(('|', '{', '}', '[', ']', '(', ')', '+', '*', '.'))),

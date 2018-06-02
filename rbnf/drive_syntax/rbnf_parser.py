@@ -1,55 +1,8 @@
-"""
-import RuikoML.*
-
-Atom ::=
-    | Name
-    | Str
-    | '(' Or ')'
-
-Trail ::=
-    | Atom ['+' | '*' | '{' Number{1, 2} '}']
-    | '~' Atom
-
-And   ::=
-    | Trail+
-
-Or    ::=
-    | And ('|' And)*
-
-Statement ::=
-    | 'ignore' '[' Name ']'
-    | 'import' Name ('.' ('*' | Name))*
-    | Name '::=' ['|']  Or [Clauses]
-    | Name ['cast'] ['as' Name] ':=' ['|'] Str+ [Clauses]
-
-Clauses ::=
-    [When] [With] [Where] [Rewrite]
-
-When ::= 'when' Expr
-
-With ::= 'with' Expr
-
-Where ::= 'where' Expr
-
-Rewrite ::= 'rewrite' Lambda
-
-Statements ::=
-    | Statement (END Statement)*
-
-
-Lang.XML:
-    import std.Name
-    XML ::= '<' Name as t1 '>'
-                (XML | ~('<' Name '>'))*
-            '<' Name as t2 '>'
-            with t1 = t2
-
-"""
-
 from rbnf.ParserC import Literal, Context, Tokenizer, State, Atom as PAtom
 from rbnf.AutoLexer.rbnf_lexer import *
 from rbnf.CachingPool import ConstStrPool
 from Redy.Magic.Classic import singleton
+from .xml import XML
 
 
 @singleton
@@ -83,6 +36,12 @@ Statement = PAtom.Named('Statement', None, None, None)
 
 Statements = PAtom.Named('Statements', None, None, None)
 
+When = PAtom.Named('When', None, None, None)
+
+With = PAtom.Named('With', None, None, None)
+
+Rewrite = PAtom.Named('Rewrite', None, None, None)
+
 Ignore = PAtom.Named("Ignore", None, None, None)
 
 Import = PAtom.Named("Import", None, None, None)
@@ -90,6 +49,10 @@ Import = PAtom.Named("Import", None, None, None)
 DefParser = PAtom.Named("DefParser", None, None, None)
 
 DefLexer = PAtom.Named("DefLexer", None, None, None)
+
+lang[When[1]] = C("when") + XML
+lang[With[1]] = C("with") + XML
+lang[Rewrite[1]] = C("rewrite") + XML
 
 lang[Atom[1]] = Name | Str | (C('(') + Str + C(')'))
 

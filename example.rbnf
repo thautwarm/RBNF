@@ -42,8 +42,31 @@ Statements ::=
 import std.Common.Name
 
 XML ::=
-    |'<' Name as _1 '>' (XML | Any)* '<' Name as _2 '/' '>'
-    |'<' Name '/' '>'
+    |'<' Name as _1 '>' (XML | Any)* as subs  '<' Name as _2 '/' '>'
+
+    |'<' Name as _1 '/' '>'
+    with
+        <language> python </language>
+        <codes>
+            def f(tokens, state):
+                ctx = state.ctx
+                return '_2' not in ctx or ctx['_1'] == ctx['_2']
+        </codes>
+    rewrite
+        <language> python </language>
+        <codes>
+            from rbnf import Tokenizer
+            from rbnf.AST import Named
+            def f(tokens, state):
+                _1: Tokenizer = ctx['_1']
+                name: str = _1.value
+                ctx = state.ctx
+                return Named(name,
+                              tuple(sub if isinstance(sub, Named) else sub.value for sub in ctx['subs'])
+                              if 'subs' in ctx
+                              else
+                              ())
+        </codes>
 
 
 

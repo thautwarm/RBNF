@@ -1,4 +1,4 @@
-from rbnf.ParserC import *
+from rbnf import *
 from Redy.Magic.Classic import cast, record
 
 _ = Atom.Any
@@ -38,26 +38,21 @@ def constraint(tokenizers: Sequence[Tokenizer], state: State):
 
 
 lang = {}
-# definitions of parsers
 xml = Atom.Named("XML", None, constraint, rewrite)
-# block = Atom.Named("block", None, None, None)
 Name = R("[a-zA-Z_]{1}[a-zA-Z0-9_]*")
-# end = C('<') + C('/') + Name + C('>')
-# begin = C('<') + Name + C('>')
 
 imp_xml = (C('<') + Name @ "tag1" + C('>') + (xml | ~(C('<') + C('/') + Name + C('>')))(0, -1) @ "subs" + C('<') + C(
         '/') + Name @ "tag2" + C('>') | C('<') + Name @ "tag1" + C('/') + C('>'))
 
-# imp_block = xml | ~(begin | end)
 
-# lang[block[1]] = imp_block  # block[:] == [Atom.Named, "block", None, None, None]
-lang[xml[1]] = imp_xml  # xml[:] == (Atom.Named, "XML", None, constraint, None]
+lang[xml[1]] = imp_xml
 
 """
-XML   ::= '<' TagName as tag1 '>'
-            (XML | ~(begin | end))+
-          '<' '/' TagName as tag2 '>'
-Block ::= XML | Not ('<' TagName '>' | '<' '/' TagName '>')
+XML   ::= | '<' Name as tag1 '>'
+               (XML | ~('<' '/' Name '>'))*
+            '<' '/' Name as tag1 '>'
+          | '<' Name as tag1  '/' '>'
+             
 """
 
 
