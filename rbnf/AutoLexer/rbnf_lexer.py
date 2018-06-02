@@ -8,17 +8,19 @@ _cast_map = set(map(ConstStrPool.cast_to_const, ["as", 'cast', 'when', 'with', '
 
 _lexer_table: List[Tuple[str, Callable[[str, int], str]]] = [
     ("auto_const" | ToConst, char_lexer(('|', '{', '}', '[', ']', '(', ')', '+', '*', '.'))),
-    ("auto_const" | ToConst, str_lexer(("::=", ":="))),
+    ("auto_const" | ToConst, str_lexer(("::=", ":=", '<', '>', '/'))),
 
     ('Comment' | ToConst, regex_lexer(re.compile(r'(#.*)|(((/\*)+?[\w\W]+?(\*/)+))'))),
     ("Str" | ToConst, regex_lexer(re.compile(r"[A-Z]'([^\\']+|\\.)*?'|'([^\\']+|\\.)*?'"))),
-    ("Name" | ToConst, regex_lexer("[a-zA-Z_\u4e00-\u9fa5][a-zA-Z0-9_\u4e00-\u9fa5\.]*")), ("Number", regex_lexer("\d+")),
+    ("Name" | ToConst, regex_lexer("[a-zA-Z_\u4e00-\u9fa5][a-zA-Z0-9_\u4e00-\u9fa5\.]*")),
+    ("Number", regex_lexer("\d+")),
 
     ("Comma" | ToConst, char_lexer(",")),  # do not match
     ("Space" | ToConst, regex_lexer('\s+'))]
 
 _Space = "Space" | ToConst
 _END = "END" | ToConst
+_UNKNOWN = 'Unknown' | ToConst
 _DropTable = set(map(id, map(ConstStrPool.cast_to_const, ["Comma", "Space"])))
 
 
@@ -57,6 +59,15 @@ def rbnf_lexing(text: str):
                 if pat in cast_map:
                     yield Tokenizer(keyword, cast_const(pat), lineno, colno)
                 else:
-                    yield Tokenizer(name, pat, lineno, colno)
+                    yield Tokenizer(cast_const(name), pat, lineno, colno)
 
             break
+        else:
+            char = text[pos]
+            yield Tokenizer(_UNKNOWN, char, lineno, colno)
+            pos += 1
+            if char == '\n':
+                lineno += 1
+                colno = 0
+            else:
+                colno += 1

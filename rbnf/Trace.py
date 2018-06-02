@@ -1,5 +1,5 @@
 from typing import Sequence, List, Generic, TypeVar
-
+from .Color import *
 T = TypeVar('T')
 
 
@@ -57,6 +57,15 @@ class Trace(Sequence[T], Generic[T]):
     def max_fetched(self):
         return len(self._records)
 
+    def __str__(self):
+        content = ', '.join(
+                Green(str(each)) if i < self._virtual_len else Red(str(each)) for i, each in enumerate(self._records))
+        return f'[{content}]'
+
+    def __repr__(self):
+        return self.__str__()
+
+
 # class Trace(Sequence[T], Generic[T]):
 #
 #     def __len__(self) -> int:
@@ -104,10 +113,3 @@ class Trace(Sequence[T], Generic[T]):
 #     def clear(self):
 #         self.virtual_length = 0
 #
-#     def __str__(self):
-#         content = ', '.join(
-#                 Green(str(each)) if i < self.virtual_length else Red(str(each)) for i, each in enumerate(self._records))
-#         return f'[{content}]'
-#
-#     def __repr__(self):
-#         return self.__str__()

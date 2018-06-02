@@ -93,3 +93,9 @@ class State(Generic[T]):
 
     def __contains__(self, item: T):
         return item in self.current
+
+    def __str__(self):
+        return self.trace.__str__()
+
+    def __repr__(self):
+        return self.__str__()
