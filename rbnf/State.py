@@ -2,7 +2,7 @@ from typing import Optional, Callable
 from Redy.Magic.Classic import singleton
 from .Trace import *
 
-Context = dict
+Context = 'Dict[str, AST]'
 
 
 @singleton
@@ -64,6 +64,10 @@ class State(Generic[T]):
     def current(self):
         trace = self.trace
         return trace[trace.end_index]
+
+    @property
+    def max_fetched(self):
+        return self.trace.max_fetched
 
     @property
     def end_index(self):

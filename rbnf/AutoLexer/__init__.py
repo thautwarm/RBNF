@@ -48,6 +48,10 @@ def lexing(text: bytes, lexer_table: BytesLexerTable, cast_map: CastMap):
             pat = case(text, pos)
             if not pat:
                 continue
+            if pat in cast_map:
+                yield Tokenizer(cast_map[pat], cast_const(pat), lineno, colno)
+            else:
+                yield Tokenizer(name, pat, lineno, colno)
             n = len(pat)
             line_inc = pat.count(newline)
             if line_inc:
@@ -57,10 +61,6 @@ def lexing(text: bytes, lexer_table: BytesLexerTable, cast_map: CastMap):
             else:
                 colno += n
             pos += n
-            if pat in cast_map:
-                yield Tokenizer(cast_map[pat], cast_const(pat), lineno, colno)
-            else:
-                yield Tokenizer(name, pat, lineno, colno)
             break
 
         else:
@@ -87,6 +87,10 @@ def lexing(text: str, lexer_table: StrLexerTable, cast_map: CastMap = None):
             pat = case(text, pos)
             if not pat:
                 continue
+            if pat in cast_map:
+                yield Tokenizer(cast_map[pat], cast_const(pat), lineno, colno)
+            else:
+                yield Tokenizer(name, pat, lineno, colno)
             n = len(pat)
             line_inc = pat.count(newline)
             if line_inc:
@@ -96,10 +100,6 @@ def lexing(text: str, lexer_table: StrLexerTable, cast_map: CastMap = None):
             else:
                 colno += n
             pos += n
-            if pat in cast_map:
-                yield Tokenizer(cast_map[pat], cast_const(pat), lineno, colno)
-            else:
-                yield Tokenizer(name, pat, lineno, colno)
             break
 
         else:
@@ -125,6 +125,7 @@ def lexing(text: str, lexer_table: StrLexerTable, _):
             pat = case(text, pos)
             if not pat:
                 continue
+            yield Tokenizer(name, pat, lineno, colno)
             n = len(pat)
             line_inc = pat.count(newline)
             if line_inc:
@@ -134,7 +135,7 @@ def lexing(text: str, lexer_table: StrLexerTable, _):
             else:
                 colno += n
             pos += n
-            yield Tokenizer(name, pat, lineno, colno)
+            break
 
         else:
             warn(Yellow(f"No handler for character `{text[pos].__repr__()}`."))
@@ -160,6 +161,7 @@ def lexing(text: bytes, lexer_table: BytesLexerTable, _):
             pat = case(text, pos)
             if not pat:
                 continue
+            yield Tokenizer(name, pat, lineno, colno)
             n = len(pat)
             line_inc = pat.count(newline)
             if line_inc:
@@ -169,8 +171,7 @@ def lexing(text: bytes, lexer_table: BytesLexerTable, _):
             else:
                 colno += n
             pos += n
-            yield Tokenizer(name, pat, lineno, colno)
-
+            break
         else:
             warn(Yellow(f"No handler for character `{text[pos].__repr__()}`."))
             if text[pos] == '\n':
@@ -232,14 +233,25 @@ def str_lexer(mode):
 def regex_lexer(regex_pat):
     """
     generate token names' cache
-    :param regex_pat:
-    :return:
     """
+
     if isinstance(regex_pat, str):
         regex_pat = re.compile(regex_pat)
 
-    def f(inp_str, pos):
-        m = regex_pat.match(inp_str, pos)
-        return m.group() if m else None
+        def f(inp_str, pos):
+            m = regex_pat.match(inp_str, pos)
+            return m.group() if m else None
+    elif hasattr(regex_pat, 'match'):
+        def f(inp_str, pos):
+            m = regex_pat.match(inp_str, pos)
+            return m.group() if m else None
+    else:
+        regex_pats = tuple(re.compile(e) for e in regex_pat)
+
+        def f(inp_str, pos):
+            for each_pat in regex_pats:
+                m = each_pat.match(inp_str, pos)
+                if m:
+                    return m.group()
 
     return f

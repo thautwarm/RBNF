@@ -187,7 +187,7 @@ def _named_match(self: Atom, tokenizers: Sequence[Tokenizer], state: State):
             if with_ and not with_(tokenizers, state):
                 return Result.mismatch()
 
-            return Result(Matched, Named(name, rewrite(state) if rewrite else result.value))
+            return Result(Matched, rewrite(state) if rewrite else Named(name, result.value))
 
         elif result.status is FindLR:
             stacked_func: LRFunc = result.value
@@ -196,7 +196,7 @@ def _named_match(self: Atom, tokenizers: Sequence[Tokenizer], state: State):
                 def stacked_func_(ast: AST):
                     stacked_result = stacked_func(ast)
                     if stacked_result.status is Matched:
-                        stacked_result.value = Named(name, rewrite(state) if rewrite else stacked_result.value)
+                        return Result.match(rewrite(state) if rewrite else Named(name, stacked_result.value))
                     return stacked_result
 
                 return Result.find_lr(stacked_func_)
@@ -218,16 +218,17 @@ def _named_match(self: Atom, tokenizers: Sequence[Tokenizer], state: State):
             if with_ and not with_(tokenizers, state):
                 return Result.mismatch()
 
-            head: Named = Named(name, rewrite(state) if rewrite else result.value)
+            head: Named = rewrite(state) if rewrite else Named(name, result.value)
             # stack jumping
             while True:
-                ctx = original_ctx.copy()
-                res = stacked_func(head, ctx)
+                with state.leave_with_context_recovery():
+                    state.ctx = state.ctx.copy()
+                    res = stacked_func(head)
                 if res.status is Unmatched:
                     break
 
                 assert res.status is Matched
-                head = Named(name, rewrite(state) if rewrite else res.value)
+                head = rewrite(state) if rewrite else Named(name, res.value)
             result.value = head
             return result
 
@@ -285,9 +286,15 @@ def _and_match(self: Composed, tokenizers: Sequence[Tokenizer], state: State) ->
             stacked_func: LRFunc = each_result.value
 
             def stacked_func_(ast: AST):
-                stacked_result = stacked_func(ast)
+                stacked_result: Result = stacked_func(ast)
                 if stacked_result.status is Matched:
+                    stacked_value = stacked_result.value
                     stacked_nested = nested.copy()
+                    if isinstance(stacked_value, Nested):
+                        stacked_nested.extend(stacked_value)
+                    else:
+                        stacked_nested.append(stacked_value)
+
                     for j in range(i + 1, len(atoms)):
                         atom_ = atoms[j]
                         each_result_ = atom_.match(tokenizers, state)
@@ -300,12 +307,11 @@ def _and_match(self: Composed, tokenizers: Sequence[Tokenizer], state: State) ->
                                 stacked_nested.append(each_value_)
                             continue
                         return Result.mismatch()
-                    stacked_result.value = stacked_nested
 
+                    return Result.match(stacked_nested)
                 return stacked_result
 
-            each_result.value = stacked_func_
-            return each_result
+            return Result.find_lr(stacked_func_)
 
     return Result(Matched, nested)
 

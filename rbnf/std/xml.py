@@ -11,24 +11,8 @@ N = Literal.N
 def rewrite(state: State) -> Named:
     ctx = state.ctx
     name = ctx['tag1'].value
-    subs = []
-    cache = []
-    if 'subs' in ctx:
-        for each in ctx['subs']:
-            if isinstance(each, Named):
-                if cache:
-                    subs.append(''.join(cache))
-                    cache.clear()
-                subs.append(each)
-            else:
-                each: Tokenizer
-                cache.append(each.value)
 
-        if cache:
-            subs.append(''.join(cache))
-            cache.clear()
-
-    return Named(name, Nested(subs))
+    return Named(name, Nested(tuple(ctx.get('subs', ()))))
 
 
 def constraint(tokenizers: Sequence[Tokenizer], state: State):

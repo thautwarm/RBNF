@@ -1,5 +1,5 @@
-from rbnf.drive_syntax.xml import language_xml, XML, imp_xml
-from rbnf.drive_syntax.rbnf_parser import rbnf_lexing
+from rbnf.std.xml import language_xml, XML, imp_xml
+from rbnf.std.rbnf_parser import rbnf_lexing
 from rbnf import Tokenizer, State, ConstStrPool
 
 from Redy.Magic.Classic import cast
