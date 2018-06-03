@@ -10,8 +10,7 @@ import std.common.[Name Space]
 
 XML ::= 
     | '<' Name as t1 '/' '>'
-    | '<' Name as t1 '>' (XML | ~('<' '/' Name '>'))* as seq '<' '/' 
-    Name as t2 '>'
+    | '<' Name as t1 '>' (XML | ~('<' '/' Name '>'))* as seq '<' '/'  Name as t2 '>'
     with
         't2' not in state.ctx or t1.value == t2.value
     rewrite
