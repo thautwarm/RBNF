@@ -180,7 +180,7 @@ def _named_match(self: Atom, tokenizers: Sequence[Tokenizer], state: State):
 
     with state.leave_with_context_recovery():
         state.append(name)
-        state.ctx = state.ctx.copy()
+        state.ctx = {}
 
         result: Result = parser.match(tokenizers, state)
         if result.status is Matched:

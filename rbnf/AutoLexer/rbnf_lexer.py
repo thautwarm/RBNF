@@ -8,12 +8,12 @@ _cast_map = set(
         map(ConstStrPool.cast_to_const, ["as", 'cast', 'when', 'where', 'with', 'rewrite', 'import', 'pyimport']))
 
 _lexer_table: List[Tuple[str, Callable[[str, int], str]]] = [
-    ("auto_const" | ToConst, char_lexer(('|', '{', '}', '[', ']', '(', ')', '+', '*', '.'))),
+    ("auto_const" | ToConst, char_lexer(('|', '{', '}', '[', ']', '(', ')', '+', '*', '.', ','))),
     ("auto_const" | ToConst, str_lexer(("::=", ":=", '<', '>', '/'))),
 
     ('Comment' | ToConst, regex_lexer(re.compile(r'(#.*)|(((/\*)+?[\w\W]+?(\*/)+))'))),
-    ("Str" | ToConst, regex_lexer(re.compile(r"[A-Z]'([^\\']+|\\.)*?'|'([^\\']+|\\.)*?'"))),
-    ("Name" | ToConst, regex_lexer("[a-zA-Z_\u4e00-\u9fa5][a-zA-Z0-9_\u4e00-\u9fa5\.]*")),
+    ("Str" | ToConst, regex_lexer(re.compile(r'[A-Z]\'([^\\\']+|\\.)*?\'|\'([^\\\']+|\\.)*?\''))),
+    ("Name" | ToConst, regex_lexer("[a-zA-Z_\u4e00-\u9fa5][a-zA-Z0-9_\u4e00-\u9fa5]*")),
     ("Number", regex_lexer("\d+")),
 
     ("Space" | ToConst, regex_lexer('\s+'))]
@@ -61,7 +61,6 @@ def rbnf_lexing(text: str):
             else:
                 colno += n
             pos += n
-
             break
         else:
             char = text[pos]

@@ -39,34 +39,17 @@ Statements ::=
 
 :XML
 
-import std.Common.Name
+import std.common.[Name Space] 
+# import `Name` and `Space` from $RBNF_HOME/std/common  
 
-XML ::=
-    |'<' Name as _1 '>' (XML | Any)* as subs  '<' Name as _2 '/' '>'
-
-    |'<' Name as _1 '/' '>'
+XML ::= 
+    | '<' Name as t1 '/' '>'
+    | '<' Name as t1 '>' (XML | ~('<' '/' Name '>'))* as seq '<' '/' 
+    Name as t2 '>'
     with
-        <language> python </language>
-        <codes>
-            def f(tokens, state):
-                ctx = state.ctx
-                return '_2' not in ctx or ctx['_1'] == ctx['_2']
-        </codes>
+        't2' not in state.ctx or t1.value == t2.value
     rewrite
-        <language> python </language>
-        <codes>
-            from rbnf import Tokenizer
-            from rbnf.AST import Named
-            def f(tokens, state):
-                _1: Tokenizer = ctx['_1']
-                name: str = _1.value
-                ctx = state.ctx
-                return Named(name,
-                              tuple(sub if isinstance(sub, Named) else sub.value for sub in ctx['subs'])
-                              if 'subs' in ctx
-                              else
-                              ())
-        </codes>
+        t1.value, seq if 'seq' in state.ctx else ()
 
 
 

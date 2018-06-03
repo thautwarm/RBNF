@@ -65,7 +65,8 @@ class Mapping2(Mapping):
 
 
 def create_ctx():
-    return dict(prefix={}, lexer_table=[], cast_map={}, _lexer_table=dict(regex=set(), literal=set()), lang={})
+    return dict(prefix={}, lexer_table=[], cast_map={}, _lexer_table=dict(regex=set(), literal=set()), lang={},
+                namespace={})
 
 
 def parse(codes: str) -> StmtsASDL:
@@ -83,8 +84,10 @@ def visit(asdl: ASDL, ctx: dict):
 
 
 @visit.case(NameASDL)
-def visit(a: NameASDL, _: dict) -> Atom.Named:
-    return N(a.value)
+def visit(a: NameASDL, ctx: dict) -> Union[Atom.Named, Literal.N]:
+    if a.value == '_':
+        return Atom.Any
+    return ctx['namespace'][a.value]
 
 
 @visit.case(NameBindASDL)
@@ -101,13 +104,14 @@ def visit(a: StrASDL, ctx) -> Literal.C:
         prefix = a.value[0]
         value = a.value[2:-1]
 
-        name = ctx['prefix'].get(prefix)
         res = {
             'R': lambda: R(value), 'C': lambda: C(value), 'V': lambda: V(value), 'N': lambda: N(value),
-        }.get(name, None)
+        }.get(prefix, None)
+
         if res:
             ret = res()
         else:
+            name = ctx['prefix'].get(prefix)
             ret = NC(name, value)
 
     _lexer_table = ctx['_lexer_table']
@@ -145,7 +149,13 @@ def visit(a: ImportASDL, ctx: dict):
     if a.is_python_import:
         from_ = '.'.join(a.paths)
         import_items = '*' if not a.import_items else ', '.join(a.import_items)
-        exec(f'from {from_} import {import_items}', ctx)
+        new_ctx = {}
+        exec(f'from {from_} import {import_items}', new_ctx)
+        if import_items is '*':
+            ctx.update(new_ctx)
+        else:
+            for each in a.import_items:
+                ctx[each] = new_ctx[each]
         return
 
     paths = [Path(os.environ.get('RBNF_HOME', './'))]
@@ -161,7 +171,10 @@ def visit(a: ImportASDL, ctx: dict):
         for path in paths:
             with path.open('r') as f:
                 text = f.read()
-            visit(parse(text), ctx)
+            asdl = parse(text)
+            yield from (visit(each, ctx) for each in asdl.value if
+                        hasattr(each, 'name') and each.name in a.import_items)
+
     elif len(paths) > 1:
         raise ValueError("Cannot wildly import specific symbol.(import *.* [some])")
     else:
@@ -171,15 +184,19 @@ def visit(a: ImportASDL, ctx: dict):
         for end in a.import_items:
             if end in ctx:
                 raise ValueError(f"Duplicated symbol `{end}` in both current file and {path}.")
+        asdls = parse(text).value
+        ends = set(a.import_items)
+        to_visits = []
+        for each in asdls:
+            if hasattr(each, 'name') and each.name in ends:
+                to_visits.append(each)
+                # visit(each, ctx)
+                ends.remove(each.name)
+        if any(ends):
+            names = ', '.join(ends)
+            raise NameError(f"Cannot found name(s) `{names}` at {path}.")
 
-        new_ctx = create_ctx()
-        visit(parse(text), new_ctx)
-
-        for end in a.import_items:
-            try:
-                ctx[end] = new_ctx[end]
-            except KeyError:
-                return f"No symbol `{end}` found in {path}"
+        yield from (visit(each, ctx) for each in to_visits)
 
 
 def str_asdls_to_lexers(s: List[StrASDL], ctx: dict):
@@ -209,17 +226,20 @@ def str_asdls_to_lexers(s: List[StrASDL], ctx: dict):
 
 @visit.case(LexerASDL)
 def visit(a: LexerASDL, ctx: dict):
+    name = a.name | ToConst
     if a.alias:
-        ctx['prefix'][a.alias] = a.name | ToConst
+        ctx['prefix'][a.alias] = name
+
+    yield name, N(a.name)
 
     lexer_table: StrLexerTable = ctx['lexer_table']
-    lexer_table.extend(zip(itertools.repeat(a.name | ToConst), str_asdls_to_lexers(a.items, ctx)))
+    lexer_table.extend(zip(itertools.repeat(name), str_asdls_to_lexers(a.items, ctx)))
 
     if a.is_const_cast:
         cast_map: CastMap = ctx['cast_map']
         for each in a.items:
             if each.value.startswith('\''):
-                cast_map[each.value[1:-1]] = a.name | ToConst
+                cast_map[each.value[1:-1]] = name
 
 
 def var_hook(codes: str):
@@ -273,16 +293,37 @@ def visit(a: ParserASDL, ctx: dict):
         rewrite_func = None
 
     named = PAtom.Named(name, when_func, with_func, rewrite_func)
+
+    yield name, named
+
     ctx[name] = named
     or_ = visit(a.or_, ctx)
     lang[named[1]] = or_
-    return
 
 
 @visit.case(StmtsASDL)
 def visit(a: StmtsASDL, ctx: dict):
+    async_objs = []
+
     for each in a.value:
-        visit(each, ctx)
+        it = visit(each, ctx)
+        if isinstance(each, ImportASDL):
+            try:
+                async_objs.extend(it)
+            except StopIteration:
+                pass
+        else:
+            async_objs.append(it)
+
+    for each in async_objs:
+        name, parser = each.send(None)
+        ctx['namespace'][name] = parser
+
+    for each in async_objs:
+        try:
+            each.send(None)
+        except StopIteration:
+            pass
 
     lexer_table = ctx['lexer_table']
     cast_map = ctx['cast_map']

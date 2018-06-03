@@ -3,7 +3,7 @@ from rbnf.ParserC import Literal, Context, Tokenizer, State, Atom as PAtom, Name
 from rbnf.AutoLexer.rbnf_lexer import *
 from rbnf.CachingPool import ConstStrPool
 from rbnf.Optimize import optimize
-from Redy.Magic.Classic import singleton, record
+from Redy.Magic.Classic import singleton, record, execute
 from typing import Sequence
 from .common import Name, Str, Number, recover_codes
 
@@ -100,8 +100,6 @@ def atom_rewrite(state: State):
         body = ctx.get('name') | IfNotNone(lambda it: NameASDL(it.value))
         if not body:
             body = ctx.get('str') | IfNotNone(lambda it: StrASDL(it.value))
-    if 'bind' in ctx:
-        return NameBindASDL(body, ctx['bind'].value)
     return body
 
 
@@ -111,21 +109,28 @@ AtomExpr = PAtom.Named("Atom", None, None, atom_rewrite)
 def trail_rewrite(state: State):
     ctx = state.ctx
     atom = ctx['atom']
-    if 'rev' in ctx:
-        return ReverseASDL(atom)
-    if 'one_or_more' in ctx:
-        return RepeatASDL(atom, 1, -1)
-    if 'zero_or_more' in ctx:
-        return RepeatASDL(atom, 0, -1)
-    if 'interval' in ctx:
-        interval: Nested = ctx['interval']
-        if len(interval) is 1:
-            least = int(interval[0].value)
-            most = -1
-        else:
-            least, most = map(lambda it: int(it.value), ctx['interval'])
-        return RepeatASDL(atom, least, most)
-    return atom
+
+    @execute
+    def ret():
+        if 'rev' in ctx:
+            return ReverseASDL(atom)
+        if 'one_or_more' in ctx:
+            return RepeatASDL(atom, 1, -1)
+        if 'zero_or_more' in ctx:
+            return RepeatASDL(atom, 0, -1)
+        if 'interval' in ctx:
+            interval: Nested = ctx['interval']
+            if len(interval) is 1:
+                least = int(interval[0].value)
+                most = -1
+            else:
+                least, most = map(lambda it: int(it.value), ctx['interval'])
+            return RepeatASDL(atom, least, most)
+        return atom
+
+    if 'bind' in ctx:
+        return NameBindASDL(ret, ctx['bind'].value)
+    return ret
 
 
 Trail = PAtom.Named('Trail', None, None, trail_rewrite)
@@ -235,18 +240,19 @@ bootstrap[When[1]] = C("when") @ "sign" + CodeItem.one_or_more @ "expr"
 bootstrap[With[1]] = C("with") @ "sign" + CodeItem.one_or_more @ "expr"
 bootstrap[Rewrite[1]] = C("rewrite") @ "sign" + CodeItem.one_or_more @ "expr"
 
-bootstrap[AtomExpr[1]] = optimize(
-        ((C('(') + Or @ "or" + C(')')) | Name @ "name" | Str @ "str") + (C('as') + Name @ "bind").optional)
+bootstrap[AtomExpr[1]] = optimize(((C('(') + Or @ "or" + C(')')) | Name @ "name" | Str @ "str"))
 
 bootstrap[Trail[1]] = optimize(C('~') @ "rev" + AtomExpr @ "atom" | AtomExpr @ "atom" + (
-        C('+') @ "one_or_more" | C('*') @ "zero_or_more" | C('{') + Number(1, 2) @ "interval" + C('}')).optional)
+        C('+') @ "one_or_more" | C('*') @ "zero_or_more" | C('{') + Number(1, 2) @ "interval" + C('}')).optional) + (
+                                  C('as') + Name @ "bind").optional
 
 bootstrap[And[1]] = Trail.one_or_more @ "value"
 
 bootstrap[Or[1]] = optimize(And @ "head" + (C('|') + And).optional @ "tail")
 
 import_syntax = optimize(C('pyimport') @ "python" | C("import")) + Name @ "head" + (
-        C('.') + (C('*') | Name)).unlimited @ "tail" + (C('[') + Name.unlimited @ "import_items" + C(']') | C("*"))
+        C('.') + (C('*') | Name)).unlimited @ "tail" + C('.') + (
+                            C('[') + (C('*') | Name.unlimited @ "import_items") + C(']'))
 bootstrap[Import[1]] = optimize(import_syntax)
 
 parserc_syntax = Name @ "name" + C('::=') + C(

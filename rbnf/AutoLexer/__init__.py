@@ -25,6 +25,7 @@ StrLexerTable = List[Tuple[str, Callable[[str, int], str]]]
 BytesLexerTable = List[Tuple[str, Callable[[bytes, int], bytes]]]
 
 CastMap = Dict[str, str]
+_UNKNOWN = "Unknown" | ToConst
 
 
 @Pattern
@@ -65,6 +66,8 @@ def lexing(text: bytes, lexer_table: BytesLexerTable, cast_map: CastMap):
 
         else:
             warn(Yellow(f"No handler for character `{text[pos].__repr__()}`."))
+            chr = text[pos]
+            yield Tokenizer(_UNKNOWN, chr, lineno, colno)
             if text[pos] == '\n':
                 lineno += 1
                 colno = 0
@@ -104,7 +107,9 @@ def lexing(text: str, lexer_table: StrLexerTable, cast_map: CastMap = None):
 
         else:
             warn(Yellow(f"No handler for character `{text[pos].__repr__()}`."))
-            if text[pos] == '\n':
+            char = text[pos]
+            yield Tokenizer(_UNKNOWN, char, lineno, colno)
+            if char == '\n':
                 lineno += 1
                 colno = 0
             pos += 1
@@ -139,6 +144,8 @@ def lexing(text: str, lexer_table: StrLexerTable, _):
 
         else:
             warn(Yellow(f"No handler for character `{text[pos].__repr__()}`."))
+            chr = text[pos]
+            yield Tokenizer(_UNKNOWN, chr, lineno, colno)
             if text[pos] == '\n':
                 lineno += 1
                 colno = 0
@@ -174,6 +181,8 @@ def lexing(text: bytes, lexer_table: BytesLexerTable, _):
             break
         else:
             warn(Yellow(f"No handler for character `{text[pos].__repr__()}`."))
+            chr = text[pos]
+            yield Tokenizer(_UNKNOWN, chr, lineno, colno)
             if text[pos] == '\n':
                 lineno += 1
                 colno = 0
