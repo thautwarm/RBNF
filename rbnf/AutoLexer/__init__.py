@@ -23,7 +23,7 @@ LexerTable = List[Tuple[T, Callable[[T, int], T]]]
 
 StrLexerTable = List[Tuple[str, Callable[[str, int], str]]]
 BytesLexerTable = List[Tuple[str, Callable[[bytes, int], bytes]]]
-
+DropTable = Set[int]
 CastMap = Dict[str, str]
 _UNKNOWN = "Unknown" | ToConst
 

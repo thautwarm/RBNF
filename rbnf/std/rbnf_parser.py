@@ -100,6 +100,8 @@ def atom_rewrite(state: State):
         body = ctx.get('name') | IfNotNone(lambda it: NameASDL(it.value))
         if not body:
             body = ctx.get('str') | IfNotNone(lambda it: StrASDL(it.value))
+            if not body:
+                body = ctx.get('optional') | IfNotNone(lambda it: RepeatASDL(it, 0, 1))
     return body
 
 
@@ -153,7 +155,10 @@ Or = PAtom.Named('Or', None, None, or_rewrite)
 
 def stmt_rewrite(state: State):
     ctx = state.ctx
-    return ctx.get('import', ctx.get('parser', ctx.get('lexer')))
+    for _ in ('ignore', 'import', 'parser', 'lexer'):
+        it = ctx.get(_, False)
+        if it:
+            return it
 
 
 Statement = PAtom.Named('Statement', None, None, stmt_rewrite)
@@ -176,6 +181,18 @@ When = PAtom.Named('When', None, None, postfix_rewrite)
 With = PAtom.Named('With', None, None, postfix_rewrite)
 
 Rewrite = PAtom.Named('Rewrite', None, None, postfix_rewrite)
+
+
+@record
+class IgnoreASDL(ASDL):
+    names: Tuple[str, ...]
+
+
+def ignore_rewrite(state: State):
+    return IgnoreASDL(tuple(name.value for name in state.ctx['names']))
+
+
+Ignore = PAtom.Named("Ignore", None, None, ignore_rewrite)
 
 
 @record
@@ -240,20 +257,24 @@ bootstrap[When[1]] = C("when") @ "sign" + CodeItem.one_or_more @ "expr"
 bootstrap[With[1]] = C("with") @ "sign" + CodeItem.one_or_more @ "expr"
 bootstrap[Rewrite[1]] = C("rewrite") @ "sign" + CodeItem.one_or_more @ "expr"
 
-bootstrap[AtomExpr[1]] = optimize(((C('(') + Or @ "or" + C(')')) | Name @ "name" | Str @ "str"))
+bootstrap[AtomExpr[1]] = optimize(
+        ((C('(') + Or @ "or" + C(')')) | (C('[') + Or @ "optional" + C(']')) | Name @ "name" | Str @ "str"))
 
-bootstrap[Trail[1]] = optimize(C('~') @ "rev" + AtomExpr @ "atom" | AtomExpr @ "atom" + (
+bootstrap[Trail[1]] = optimize((C('~') @ "rev" + AtomExpr @ "atom" | AtomExpr @ "atom" + (
         C('+') @ "one_or_more" | C('*') @ "zero_or_more" | C('{') + Number(1, 2) @ "interval" + C('}')).optional) + (
-                                  C('as') + Name @ "bind").optional
+                                       C('as') + Name @ "bind").optional)
 
 bootstrap[And[1]] = Trail.one_or_more @ "value"
 
 bootstrap[Or[1]] = optimize(And @ "head" + (C('|') + And).optional @ "tail")
 
-import_syntax = optimize(C('pyimport') @ "python" | C("import")) + Name @ "head" + (
-        C('.') + (C('*') | Name)).unlimited @ "tail" + C('.') + (
-                            C('[') + (C('*') | Name.unlimited @ "import_items") + C(']'))
+import_syntax = optimize(
+        (C('pyimport') @ "python" | C("import")) + Name @ "head" + (C('.') + (C('*') | Name)).unlimited @ "tail" + C(
+                '.') + C('[') + (C('*') | Name.unlimited @ "import_items") + C(']'))
+
 bootstrap[Import[1]] = optimize(import_syntax)
+
+bootstrap[Ignore[1]] = optimize(C("ignore") + C('[') + Name.one_or_more @ "names" + C(']'))
 
 parserc_syntax = Name @ "name" + C('::=') + C(
         '|').optional + Or @ "or" + When.optional @ "when" + With.optional @ "with" + Rewrite.optional @ "rewrite"
@@ -263,5 +284,5 @@ lexer_syntax = Name @ "name" + C('cast').optional @ "cast" + (C('as') + Name @ "
         '|').optional + Str.one_or_more @ "lexers"
 bootstrap[DefLexer[1]] = optimize(lexer_syntax)
 
-bootstrap[Statement[1]] = Import @ "import" | DefParser @ "parser" | DefLexer @ "lexer"
+bootstrap[Statement[1]] = Ignore @ "ignore" | Import @ "import" | DefParser @ "parser" | DefLexer @ "lexer"
 bootstrap[Statements[1]] = optimize(END.optional + (Statement + END.optional).unlimited @ "seq")

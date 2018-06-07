@@ -5,7 +5,7 @@ StrLexerTable = List[Tuple[str, Callable[[str, int], str]]]
 _keyword = ConstStrPool.cast_to_const("keyword")
 
 _cast_map = set(
-        map(ConstStrPool.cast_to_const, ["as", 'cast', 'when', 'where', 'with', 'rewrite', 'import', 'pyimport']))
+    map(ConstStrPool.cast_to_const, ["as", 'cast', 'when', 'where', 'with', 'rewrite', 'import', 'pyimport', 'ignore']))
 
 _lexer_table: List[Tuple[str, Callable[[str, int], str]]] = [
     ("auto_const" | ToConst, char_lexer(('|', '{', '}', '[', ']', '(', ')', '+', '*', '.', ','))),
@@ -13,8 +13,7 @@ _lexer_table: List[Tuple[str, Callable[[str, int], str]]] = [
 
     ('Comment' | ToConst, regex_lexer(re.compile(r'(#.*)|(((/\*)+?[\w\W]+?(\*/)+))'))),
     ("Str" | ToConst, regex_lexer(re.compile(r'[A-Z]\'([^\\\']+|\\.)*?\'|\'([^\\\']+|\\.)*?\''))),
-    ("Name" | ToConst, regex_lexer("[a-zA-Z_\u4e00-\u9fa5][a-zA-Z0-9_\u4e00-\u9fa5]*")),
-    ("Number", regex_lexer("\d+")),
+    ("Name" | ToConst, regex_lexer("[a-zA-Z_\u4e00-\u9fa5][a-zA-Z0-9_\u4e00-\u9fa5]*")), ("Number", regex_lexer("\d+")),
 
     ("Space" | ToConst, regex_lexer('\s+'))]
 

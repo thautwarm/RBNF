@@ -1,5 +1,6 @@
 from typing import Sequence, List, Generic, TypeVar
 from .Color import *
+
 T = TypeVar('T')
 
 
@@ -64,7 +65,6 @@ class Trace(Sequence[T], Generic[T]):
 
     def __repr__(self):
         return self.__str__()
-
 
 # class Trace(Sequence[T], Generic[T]):
 #

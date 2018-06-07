@@ -20,7 +20,7 @@ R = Literal.R
 
 
 class Mapping1(Mapping):
-    __slots__ = ['mapping', 'tokens', 'state']
+    __slots__ = ['mapping', 'tokens', 'state', 'globals']
 
     def __len__(self) -> int:
         return len(self.mapping)
@@ -28,22 +28,25 @@ class Mapping1(Mapping):
     def __iter__(self):
         yield from self.mapping
 
-    def __init__(self, tokens: Sequence[Tokenizer], state: State):
+    def __init__(self, tokens: Sequence[Tokenizer], state: State, globals: dict):
         self.mapping = state.ctx
         self.tokens = tokens
         self.state = state
+        self.globals = globals
 
     def __getitem__(self, k):
-        return {
+        v = {
             'state': lambda: self.state, 'tokens': lambda: self.tokens
-        }.get(k, lambda: self.mapping[k])()
+        }.get(k, lambda: self.mapping.get(k))()
+
+        return v if v is not None else self.globals.get(k)
 
     def __setitem__(self, key, value):
         self.mapping[key] = value
 
 
 class Mapping2(Mapping):
-    __slots__ = ['mapping', 'state']
+    __slots__ = ['mapping', 'state', 'globals']
 
     def __len__(self) -> int:
         return len(self.mapping)
@@ -51,22 +54,27 @@ class Mapping2(Mapping):
     def __iter__(self):
         yield from self.mapping
 
-    def __init__(self, state: State):
+    def __init__(self, state: State, globals: dict):
         self.mapping = state.ctx
         self.state = state
+        self.globals = globals
 
     def __getitem__(self, k):
         if k == 'state':
             return self.state
-        return self.mapping[k]
+        v = self.mapping.get(k)
+        if v is None:
+            return self.globals.get(k)
+        return v
 
     def __setitem__(self, key, value):
         self.mapping[key] = value
 
 
 def create_ctx():
+    import builtins
     return dict(prefix={}, lexer_table=[], cast_map={}, _lexer_table=dict(regex=set(), literal=set()), lang={},
-                namespace={})
+                namespace={}, ignore_lexer_names=set(), **builtins.__dict__)
 
 
 def parse(codes: str) -> StmtsASDL:
@@ -261,8 +269,8 @@ def visit(a: ParserASDL, ctx: dict):
         when_code = compile(when, ctx.get('__filename__', '<input>'), 'exec')
 
         def when_func(tokens, state):
-            ctx_view = Mapping1(tokens, state)
-            exec(when_code, {}, ctx_view)
+            ctx_view = Mapping1(tokens, state, ctx)
+            exec(when_code, ctx, ctx_view)
             return ctx_view['__result__']
     else:
         when_func = None
@@ -272,8 +280,8 @@ def visit(a: ParserASDL, ctx: dict):
         with_code = compile(with_, ctx.get('__filename__', '<input>'), 'exec')
 
         def with_func(tokens, state):
-            ctx_view = Mapping1(tokens, state)
-            exec(with_code, {}, ctx_view)
+            ctx_view = Mapping1(tokens, state, ctx)
+            exec(with_code, ctx, ctx_view)
             return ctx_view['__result__']
 
 
@@ -285,8 +293,8 @@ def visit(a: ParserASDL, ctx: dict):
         rewrite_code = compile(rewrite, ctx.get('__filename__', '<input>'), 'exec')
 
         def rewrite_func(state):
-            ctx_view = Mapping2(state)
-            exec(rewrite_code, {}, ctx_view)
+            ctx_view = Mapping2(state, ctx)
+            exec(rewrite_code, ctx, ctx_view)
             return ctx_view['__result__']
 
     else:
@@ -307,6 +315,9 @@ def visit(a: StmtsASDL, ctx: dict):
 
     for each in a.value:
         it = visit(each, ctx)
+        if isinstance(each, IgnoreASDL):
+            continue
+
         if isinstance(each, ImportASDL):
             try:
                 async_objs.extend(it)
@@ -328,7 +339,19 @@ def visit(a: StmtsASDL, ctx: dict):
     lexer_table = ctx['lexer_table']
     cast_map = ctx['cast_map']
 
-    def lex(codes: str):
+    ignore_lexer_names: Set[id] = set(map(lambda it: id(it | ToConst), ctx['ignore_lexer_names']))
+
+    def _lex(codes: str):
         return lexing(codes, lexer_table, cast_map)
 
+    if ignore_lexer_names:
+        def lex(codes: str):
+            yield from (e for e in _lex(codes) if id(e.name) not in ignore_lexer_names)
+    else:
+        lex = _lex
     ctx['lex'] = lex
+
+
+@visit.case(IgnoreASDL)
+def visit(a: IgnoreASDL, ctx: dict):
+    ctx['ignore_lexer_names'].update(a.names)

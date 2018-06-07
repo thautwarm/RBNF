@@ -1,7 +1,8 @@
+import os
 from rbnf.std.compiler import *
 from Redy.Tools.PathLib import Path
-import os
-os.environ['RBNF_HOME'] = Path('../ruiko_libs').__str__()
+
+os.environ['RBNF_HOME'] = Path('../rbnf_libs').__str__()
 source_code = """
 import std.common.[Name Space]
 
@@ -23,14 +24,13 @@ state = State(ctx['lang'])
 result = ctx['XML'].match(tokens, state)
 assert result.status is Unmatched
 
-tokens = tuple(ctx['lex'](
-    '<abc>'
-    '<nested>'
-    '<abc>'
-    'abc    '
-    '</abc></nested>'
-    '<single/>'
-    '</abc> '))
+tokens = tuple(ctx['lex']('<abc>'
+                          '<nested>'
+                          '<abc>'
+                          'abc    '
+                          '</abc></nested>'
+                          '<single/>'
+                          '</abc> '))
 state = State(ctx['lang'])
 result = ctx['XML'].match(tokens, state)
 print(result)

@@ -11,7 +11,6 @@ def format_ast(self: 'AST', i: int):
         content = (' ' * i) + str(self)
     return content
 
-
 class AST:
     pass
 
