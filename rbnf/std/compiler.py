@@ -167,24 +167,35 @@ def visit(a: ImportASDL, ctx: dict):
         return
 
     paths = [Path(os.environ.get('RBNF_HOME', './'))]
-    for each_into in a.paths:
-        new_path = []
-        for each_path in paths.copy():
-            if each_into == '*':
-                new_path.extend(each_path.list_dir())
-            else:
-                new_path.append(each_path.into(each_into))
-        paths = new_path
+    *headn, end = a.paths
+
+    if headn:
+        for each_into in headn:
+            new_paths = []
+            action = (lambda new, one: new.extend(one.list_dir())) if each_into == '*' else (
+                lambda new, one: new.append(one.into(each_into)))
+            for each_path in paths:
+                action(new_paths, each_path)
+            paths = new_paths
+
+    new_paths = []
+    action = (lambda new, one: new.extend(
+            [p for p in one.list_dir() if p.relative().lower().endswith(".rbnf")])) if end == '*' else (
+        lambda new, one: new.append(one.into(end + '.rbnf')))
+    for each_path in paths:
+        action(new_paths, each_path)
+    paths = new_paths
+
     if not a.import_items:
         for path in paths:
             with path.open('r') as f:
                 text = f.read()
             asdl = parse(text)
-            yield from (visit(each, ctx) for each in asdl.value if
-                        hasattr(each, 'name') and each.name in a.import_items)
+            yield from (visit(each, ctx) for each in asdl.value if hasattr(each, 'name'))
 
     elif len(paths) > 1:
         raise ValueError("Cannot wildly import specific symbol.(import *.* [some])")
+
     else:
         path = paths[0]
         with path.open('r') as f:

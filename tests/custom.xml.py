@@ -2,10 +2,10 @@ import os
 from rbnf.std.compiler import *
 from Redy.Tools.PathLib import Path
 
-os.environ['RBNF_HOME'] = Path('../rbnf_libs').__str__()
 source_code = """
 import std.common.[Name Space]
-
+ignore [Space]
+                
 XML ::= 
     | '<' Name as t1 '/' '>'
     | '<' Name as t1 '>' (XML | ~('<' '/' Name '>'))* as seq '<' '/' Name as t2 '>'
