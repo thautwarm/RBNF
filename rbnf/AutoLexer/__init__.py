@@ -219,7 +219,6 @@ def str_lexer(mode):
     generate token strings' cache
     """
     cast_to_const = ConstStrPool.cast_to_const
-
     def f_raw(inp_str, pos):
         return cast_to_const(mode) if inp_str.startswith(mode, pos) else None
 

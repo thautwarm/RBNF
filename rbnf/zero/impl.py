@@ -9,7 +9,6 @@ class ZeroExp:
         state = State(bootstrap)
         tokens = tuple(rbnf_lexing(bnf_syntax))
         result = Statements.match(tokens, state)
-
         if result.status is Unmatched:
             max_fetched = state.max_fetched
             tk: Tokenizer = tokens[max_fetched]
@@ -47,5 +46,5 @@ class ZeroExp:
 
 
 def compile(bnf_syntax: str, use: str = None):
-    bnf_syntax = "import std.common.[*]\n" + bnf_syntax
+    bnf_syntax = bnf_syntax
     return ZeroExp(bnf_syntax, use)

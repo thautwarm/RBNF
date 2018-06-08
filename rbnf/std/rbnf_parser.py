@@ -266,7 +266,7 @@ bootstrap[Trail[1]] = optimize((C('~') @ "rev" + AtomExpr @ "atom" | AtomExpr @ 
 
 bootstrap[And[1]] = Trail.one_or_more @ "value"
 
-bootstrap[Or[1]] = optimize(And @ "head" + (C('|') + And).optional @ "tail")
+bootstrap[Or[1]] = optimize(And @ "head" + (C('|') + And).unlimited @ "tail")
 
 import_syntax = optimize(
         (C('pyimport') @ "python" | C("import")) + Name @ "head" + (C('.') + (C('*') | Name)).unlimited @ "tail" + C(

@@ -11,6 +11,8 @@ def recover_codes(tokens: Iterator[Tokenizer]):
     """
     from a series of tokenizers to code string. (preserve the indentation)
     """
+    tokens = iter(tokens)
+
     s = []
     head = next(tokens)
     lineno = head.lineno
