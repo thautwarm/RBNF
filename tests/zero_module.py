@@ -1,6 +1,6 @@
-import rbnf.zero as zero
+import rbnf.zero as ze
 
-zero_exp = zero.compile("""
+zero_exp = ze.compile("""
 import std.common.[Number Name Space]
 ignore [Space]
 Numeric ::= Number as integer ['.' Number as floating]
@@ -24,4 +24,5 @@ Poly ::=  ['-' as neg] Term as head Add* as seq
                 for coef, power in seq:
                     mapping[power] += coef
             sorted(mapping.items(), key=lambda kv: kv[0])""")
+
 print(zero_exp("2x^2 + 3 + 4 - 7 x^5 + 4 x + 5 x ^2 - x + 7 x ^ 11").result)
