@@ -38,14 +38,4 @@ text = """
   <meta name="viewport" content="width=device-width">
 ....
 """
-
-#
-#
-import re
-
-re_exp = re.compile(
-        r'(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9]\.[^\s]{2,})')
-print(timeit.timeit("ze_exp.match(text)", globals=globals(), number=100))
-print(timeit.timeit("re_exp.match(text)", globals=globals(), number=100))
-
-# I'm sorry to be so slow...
+timeit.timeit("ze_exp.match(text)", globals=globals(), number=100)

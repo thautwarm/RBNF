@@ -18,6 +18,7 @@ class ZeroExp:
                               Green(before) + Red(later))
 
         asdl = result.value
+
         ctx = create_ctx()
         visit(asdl, ctx)
         lexer = ctx['lex']

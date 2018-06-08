@@ -96,11 +96,11 @@ class Literal(Parser, ConsInd, traits.Dense, traits.Im):
         try:
             token = tokenizers[state.end_index]
         except IndexError:
-            return Result.mismatch()
+            return Result.mismatched
         if self[1](token):
             state.new_one()
             return Result.match(token)
-        return Result.mismatch()
+        return Result.mismatched
 
     def __invert__(self):
         # noinspection PyCallingNonCallable
@@ -125,7 +125,7 @@ def _any_match(_, tokenizers: Sequence[Tokenizer], state: State) -> Result:
     try:
         token = tokenizers[state.end_index]
     except IndexError:
-        return Result.mismatch()
+        return Result.mismatched
     state.new_one()
     return Result.match(token)
 
@@ -158,18 +158,14 @@ def _bind_match(self: Atom, tokenizers: Sequence[Tokenizer], state: State):
 def _named_match(self: Atom, tokenizers: Sequence[Tokenizer], state: State):
     _, name, when, with_, rewrite = self
     lang = state.lang
-    when: When
-    with_: With
-    rewrite: Rewrite
-
     if when and not when(tokenizers, state):
-        return Result.mismatch()
+        return Result.mismatched
 
     parser: 'Composed.Or' = lang[name]
 
     if name in state:
         if state.lr_name:
-            return Result.mismatch()
+            return Result.mismatched
 
         state.lr_name = name
 
@@ -185,7 +181,7 @@ def _named_match(self: Atom, tokenizers: Sequence[Tokenizer], state: State):
         result: Result = parser.match(tokenizers, state)
         if result.status is Matched:
             if with_ and not with_(tokenizers, state):
-                return Result.mismatch()
+                return Result.mismatched
 
             return Result(Matched, rewrite(state) if rewrite else Named(name, result.value))
 
@@ -201,7 +197,7 @@ def _named_match(self: Atom, tokenizers: Sequence[Tokenizer], state: State):
 
                 return Result.find_lr(stacked_func_)
         else:
-            return Result.mismatch()
+            return Result.mismatched
 
         # find lr and state.lr_name is name
 
@@ -213,10 +209,10 @@ def _named_match(self: Atom, tokenizers: Sequence[Tokenizer], state: State):
             if result.status is Unmatched:
                 return result
 
-            assert result.status is not FindLR
+            # assert result.status is not FindLR
 
             if with_ and not with_(tokenizers, state):
-                return Result.mismatch()
+                return Result.mismatched
 
             head: Named = rewrite(state) if rewrite else Named(name, result.value)
             # stack jumping
@@ -227,7 +223,7 @@ def _named_match(self: Atom, tokenizers: Sequence[Tokenizer], state: State):
                 if res.status is Unmatched:
                     break
 
-                assert res.status is Matched
+                # assert res.status is Matched
                 head = rewrite(state) if rewrite else Named(name, res.value)
             result.value = head
             return result
@@ -257,9 +253,14 @@ def _not_match(self: Composed, tokenizers: Sequence[Tokenizer], state: State) ->
     history = state.commit()
     if which.match(tokenizers, state).status is Unmatched:
         state.reset(history)
-        return Atom.Any.match(tokenizers, state)
+        try:
+            token = tokenizers[state.end_index]
+        except IndexError:
+            return Result.mismatched
+        state.new_one()
+        return Result.match(token)
     state.reset(history)
-    return Result.mismatch()
+    return Result.mismatched
 
 
 @Composed.match.case(Composed.And)
@@ -267,20 +268,21 @@ def _and_match(self: Composed, tokenizers: Sequence[Tokenizer], state: State) ->
     atoms: List[Atom] = self[1]
     history = state.commit()
     nested = Nested()
-
+    nested_extend = nested.extend
+    nested_append = nested.append
     # no tco here, so I have to repeat myself.
     for i in range(len(atoms)):
         atom = atoms[i]
         each_result = atom.match(tokenizers, state)
         if each_result.status is Unmatched:
             state.reset(history)
-            return Result.mismatch()
+            return Result.mismatched
         elif each_result.status is Matched:
             each_value = each_result.value
-            if isinstance(each_value, Nested):
-                nested.extend(each_value)
+            if each_value.__class__ is Nested:
+                nested_extend(each_value)
             else:
-                nested.append(each_value)
+                nested_append(each_value)
             continue
         else:
             stacked_func: LRFunc = each_result.value
@@ -290,10 +292,13 @@ def _and_match(self: Composed, tokenizers: Sequence[Tokenizer], state: State) ->
                 if stacked_result.status is Matched:
                     stacked_value = stacked_result.value
                     stacked_nested = nested.copy()
-                    if isinstance(stacked_value, Nested):
-                        stacked_nested.extend(stacked_value)
+                    _append = stacked_nested.append
+                    _extend = stacked_nested.extend
+
+                    if stacked_value.__class__ is Nested:
+                        _extend(stacked_value)
                     else:
-                        stacked_nested.append(stacked_value)
+                        _append(stacked_value)
 
                     for j in range(i + 1, len(atoms)):
                         atom_ = atoms[j]
@@ -301,12 +306,12 @@ def _and_match(self: Composed, tokenizers: Sequence[Tokenizer], state: State) ->
 
                         if each_result_.status is Matched:
                             each_value_ = each_result_.value
-                            if isinstance(each_value_, Nested):
-                                stacked_nested.extend(each_value_)
+                            if each_value_.__class__ is Nested:
+                                _extend(each_value_)
                             else:
-                                stacked_nested.append(each_value_)
+                                _append(each_value_)
                             continue
-                        return Result.mismatch()
+                        return Result.mismatched
 
                     return Result.match(stacked_nested)
                 return stacked_result
@@ -327,7 +332,7 @@ def _or_match(self: Composed, tokenizers: Sequence[Tokenizer], state: State) -> 
 
         state.reset(history)
         continue
-    return Result.mismatch()
+    return Result.mismatched
 
 
 @Composed.match.case(Composed.Seq)
@@ -340,7 +345,7 @@ def _seq_match(self: Composed, tokenizers: Sequence[Tokenizer], state: State) ->
     history = state.commit()
     nested = Nested()
 
-    def foreach(times: int, parsed: Nested):
+    def foreach(times: int, _extend_fn, _append_fn):
         if times == most:
             return FINISH
         sub_res: Result = parser.match(tokenizers, state)
@@ -355,15 +360,15 @@ def _seq_match(self: Composed, tokenizers: Sequence[Tokenizer], state: State) ->
             return sub_res.value
 
         sub_value = sub_res.value
-        if isinstance(sub_value, Nested):
-            parsed.extend(sub_value)
+        if sub_value.__class__ is Nested:
+            _extend_fn(sub_value)
         else:
-            parsed.append(sub_value)
+            _append_fn(sub_value)
         return CONTINUE
 
     now = 0
     while True:
-        status = foreach(now, nested)
+        status = foreach(now, nested.extend, nested.append)
         if status is CONTINUE:
             now += 1
             continue
@@ -372,7 +377,7 @@ def _seq_match(self: Composed, tokenizers: Sequence[Tokenizer], state: State) ->
 
         elif status is FAIL:
             state.reset(history)
-            return Result.mismatch()
+            return Result.mismatched
 
         stacked_func = status
 
@@ -382,17 +387,17 @@ def _seq_match(self: Composed, tokenizers: Sequence[Tokenizer], state: State) ->
             res: Result = stacked_func(ast)
 
             if res.status is Unmatched:
-                return Result.mismatch() if now_ < least else Result.match(parsed_)
+                return Result.mismatched if now_ < least else Result.match(parsed_)
 
             now_ += 1
             while True:
-                status_ = foreach(now_, parsed_)
+                status_ = foreach(now_, parsed_.extend, parsed_.append)
                 if status_ is FINISH:
                     return Result.match(parsed_)
                 elif status_ is CONTINUE:
                     now_ += 1
                     continue
-                return Result.mismatch()
+                return Result.mismatched
 
         return Result.find_lr(stacked_func_)
 
@@ -404,11 +409,11 @@ def _jump_match(self: Composed, tokenizers: Sequence[Tokenizer], state: State) -
     try:
         token = tokenizers[state.end_index]
     except IndexError:
-        return Result.mismatch()
+        return Result.mismatched
 
     parser = parser_dict.get(token.value)
     if not parser:
-        return Result.mismatch()
+        return Result.mismatched
     history = state.commit()
     state.new_one()
     result = parser.match(tokenizers, state)

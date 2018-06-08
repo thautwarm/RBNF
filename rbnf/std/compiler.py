@@ -351,6 +351,7 @@ def visit(a: StmtsASDL, ctx: dict):
     cast_map = ctx['cast_map']
 
     ignore_lexer_names: Set[id] = set(map(lambda it: id(it | ToConst), ctx['ignore_lexer_names']))
+
     def _lex(codes: str):
         return lexing(codes, lexer_table, cast_map)
 

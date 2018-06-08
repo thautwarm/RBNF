@@ -18,6 +18,7 @@ FindLR: Status = Status.FindLR
 
 
 class Result:
+    mismatched: 'Result'
     __slots__ = ['status', 'value']
 
     status: Status
@@ -47,3 +48,4 @@ class Result:
 
 
 _mismatch = Result(Unmatched, None)
+Result.mismatched = _mismatch
