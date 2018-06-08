@@ -25,4 +25,4 @@ Poly ::=  ['-' as neg] Term as head Add* as seq
                     mapping[power] += coef
             sorted(mapping.items(), key=lambda kv: kv[0])""")
 
-print(zero_exp("2x^2 + 3 + 4 - 7 x^5 + 4 x + 5 x ^2 - x + 7 x ^ 11").result)
+print(zero_exp.match("2x^2 + 3 + 4 - 7 x^5 + 4 x + 5 x ^2 - x + 7 x ^ 11").result)
