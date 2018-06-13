@@ -295,7 +295,7 @@ def visit(a: ParserASDL, ctx: dict):
     if when:
         stmts, expr = when
         if stmts is None:
-            expr_code = compile(expr, ctx.get('__filename__', '<when-clause::return>'), "eval")
+            expr_code = compile(expr, ctx.get('__filename__', f'<{name}-when-clause::return>'), "eval")
 
             @feature
             def when_func(tokens: Sequence[Tokenizer], state: State):
@@ -305,8 +305,8 @@ def visit(a: ParserASDL, ctx: dict):
                 local = constexpr[LocalContextProxy](global_ctx, inner_ctx)
                 return eval(constexpr[expr_code], global_ctx, local)
         else:
-            stmts_code = compile(stmts, ctx.get('__filename__', '<when-clause::stmts>'), "exec")
-            expr_code = compile(expr, ctx.get('__filename__', '<when-clause::return>'), "eval")
+            stmts_code = compile(stmts, ctx.get('__filename__', f'<{name}-when-clause::stmts>'), "exec")
+            expr_code = compile(expr, ctx.get('__filename__', f'<{name}-when-clause::return>'), "eval")
 
             @feature
             def when_func(tokens: Sequence[Tokenizer], state: State):
@@ -324,7 +324,7 @@ def visit(a: ParserASDL, ctx: dict):
     if with_:
         stmts, expr = with_
         if stmts is None:
-            expr_code = compile(expr, ctx.get('__filename__', '<with-clause::return>'), "eval")
+            expr_code = compile(expr, ctx.get('__filename__', f'<{name}-with-clause::return>'), "eval")
 
             @feature
             def with_func(tokens: Sequence[Tokenizer], state: State):
@@ -335,8 +335,8 @@ def visit(a: ParserASDL, ctx: dict):
                 return constexpr[eval](constexpr[expr_code], global_ctx, local)
 
         else:
-            stmts_code = compile(stmts, ctx.get('__filename__', '<with-clause::stmts>'), "exec")
-            expr_code = compile(expr, ctx.get('__filename__', '<with-clause::return>'), "eval")
+            stmts_code = compile(stmts, ctx.get('__filename__', f'<{name}-with-clause::stmts>'), "exec")
+            expr_code = compile(expr, ctx.get('__filename__', f'<{name}-with-clause::return>'), "eval")
 
             @feature
             def with_func(tokens: Sequence[Tokenizer], state: State):
@@ -354,7 +354,7 @@ def visit(a: ParserASDL, ctx: dict):
     if rewrite:
         stmts, expr = rewrite
         if stmts is None:
-            expr_code = compile(expr, ctx.get('__filename__', '<rewrite-clause::return>'), "eval")
+            expr_code = compile(expr, ctx.get('__filename__', f'<{name}-rewrite-clause::return>'), "eval")
 
             @feature
             def rewrite_func(state: State):
@@ -364,8 +364,8 @@ def visit(a: ParserASDL, ctx: dict):
                 local = constexpr[LocalContextProxy](global_ctx, inner_ctx)
                 return constexpr[eval](constexpr[expr_code], local, local)
         else:
-            stmts_code = compile(stmts, ctx.get('__filename__', '<rewrite-clause::stmts>'), "exec")
-            expr_code = compile(expr, ctx.get('__filename__', '<rewrite-clause::return>'), "eval")
+            stmts_code = compile(stmts, ctx.get('__filename__', f'<{name}-rewrite-clause::stmts>'), "exec")
+            expr_code = compile(expr, ctx.get('__filename__', f'<{name}-rewrite-clause::return>'), "eval")
 
             @feature
             def rewrite_func(state: State):

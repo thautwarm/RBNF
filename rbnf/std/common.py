@@ -36,3 +36,7 @@ def recover_codes(tokens: Iterator[Tokenizer]):
         s.append(each.value)
         colno += len(s[-1])
     return ''.join(s)
+
+
+def underline_mangling(name: str):
+    return name.replace('_', '__')
