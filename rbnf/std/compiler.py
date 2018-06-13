@@ -1,16 +1,23 @@
 import itertools
+import types
 
 from .rbnf_parser import *
 from ..AutoLexer import lexing
 from ..ParserC import *
 from Redy.Magic.Pattern import Pattern
+
+try:
+    from Redy.Opt.ConstExpr import feature
+except:
+    from Redy.Opt.ConstExpr import optimize as feature
+from Redy.Opt.ConstExpr import constexpr, const
 from Redy.Collections.Traversal import chunk_by
 from Redy.Magic.Classic import cast
 from Redy.Tools.PathLib import Path
 from ..Optimize import optimize
 from .rbnf_parser import Statements, bootstrap, rbnf_lexing, IfNotNone
 from .common import *
-import os
+import os, ast
 
 C = Literal.C
 N = Literal.N
@@ -18,61 +25,64 @@ NC = Literal.NC
 V = Literal.V
 R = Literal.R
 
+import ast
+import builtins
 
-class Mapping1(Mapping):
-    __slots__ = ['mapping', 'tokens', 'state', 'globals']
 
+# class AccessorRewriter(ast.NodeTransformer):
+#     def __init__(self, fixed=('tokens', 'state')):
+#         super(AccessorRewriter, self).__init__()
+#         self.fixed = fixed
+#         self.globals = set()
+
+#
+# def _init_fn_with_ctx(fn_name, arg_names, stmts):
+#     lineno, col_offset = stmts[0].lineno, 0
+#
+#     if isinstance(stmts[0], ast.Global):
+#         stmts[0].names.extend(["tokens", "state"])
+#     else:
+#         stmts = [ast.Global(lineno=lineno, col_offset=0, names=['tokens', 'state']), *stmts]
+#
+#     args = [ast.arg(lineno=lineno, col_offset=col_offset, arg=name, annotation=None) for name in arg_names]
+#
+#     ast.Global(lineno=lineno, col_offset=0, names=['tokens', 'tokens'])
+#
+#     return ast.Module(body=[ast.FunctionDef(lineno=lineno, col_offset=col_offset, name=fn_name,
+#                                             args=ast.arguments(args=args, vararg=None, kwonlyargs=[], kw_defaults=[],
+#                                                                kwarg=None, defaults=[]), body=stmts,
+#                                             decorator_list=[], returns=None)])
+
+
+class LocalContextProxy(dict):
     def __len__(self) -> int:
-        return len(self.mapping)
+        return len(self.local)
 
     def __iter__(self):
-        yield from self.mapping
+        yield from self.local
 
-    def __init__(self, tokens: Sequence[Tokenizer], state: State, globals: dict):
-        self.mapping = state.ctx
-        self.tokens = tokens
-        self.state = state
-        self.globals = globals
+    __slots__ = ['get', 'set', 'glob', 'local']
+    undef = object()
 
-    def __getitem__(self, k):
-        v = {
-            'state': lambda: self.state, 'tokens': lambda: self.tokens
-        }.get(k, lambda: self.mapping.get(k))()
-
-        return v if v is not None else self.globals.get(k)
-
-    def __setitem__(self, key, value):
-        self.mapping[key] = value
-
-
-class Mapping2(Mapping):
-    __slots__ = ['mapping', 'state', 'globals']
-
-    def __len__(self) -> int:
-        return len(self.mapping)
-
-    def __iter__(self):
-        yield from self.mapping
-
-    def __init__(self, state: State, globals: dict):
-        self.mapping = state.ctx
-        self.state = state
-        self.globals = globals
+    # noinspection PyMissingConstructor
+    def __init__(self, global_dict: dict, local_dict: dict):
+        self.get = local_dict.get
+        self.set = local_dict.__setitem__
+        self.local = local_dict
+        self.glob = global_dict
 
     def __getitem__(self, k):
-        if k == 'state':
-            return self.state
-        v = self.mapping.get(k)
-        if v is None:
-            return self.globals.get(k)
+        v = self.get(k, self.undef)
+
+        if v is self.undef:
+            return self.glob.get(k)
         return v
 
-    def __setitem__(self, key, value):
-        self.mapping[key] = value
+    def __setitem__(self, k, v):
+        self.set(k, v)
 
 
 def create_ctx():
-    import builtins
     return dict(prefix={}, lexer_table=[], cast_map={}, _lexer_table=dict(regex=set(), literal=set()), lang={},
                 namespace={}, ignore_lexer_names=set(), **builtins.__dict__)
 
@@ -261,11 +271,17 @@ def visit(a: LexerASDL, ctx: dict):
                 cast_map[each.value[1:-1]] = name
 
 
-def var_hook(codes: str):
-    n = codes.rfind('\n')
-    if n is -1:
-        return f'__result__ = {codes}'
-    return f'{codes[:n]}\n__result__ = {codes[n+1:]}'
+def var_hook(codes: str) -> Tuple[Optional[ast.Module], ast.Expression]:
+    ast_module: ast.Module = ast.parse(codes)
+    body = ast_module.body
+    if isinstance(body[-1], ast.Expr):
+        _expr = body.pop()
+        expr = ast.Expression(_expr.value)
+    else:
+        expr = ast.Expression(ast.NameConstant(linenoo=0, col_offset=0, value=None))
+    if not body:
+        return None, expr
+    return ast_module, expr
 
 
 @visit.case(ParserASDL)
@@ -277,37 +293,88 @@ def visit(a: ParserASDL, ctx: dict):
 
     when = a.when | IfNotNone(var_hook)
     if when:
-        when_code = compile(when, ctx.get('__filename__', '<input>'), 'exec')
+        stmts, expr = when
+        if stmts is None:
+            expr_code = compile(expr, ctx.get('__filename__', '<when-clause::return>'), "eval")
 
-        def when_func(tokens, state):
-            ctx_view = Mapping1(tokens, state, ctx)
-            exec(when_code, ctx, ctx_view)
-            return ctx_view['__result__']
+            @feature
+            def when_func(tokens: Sequence[Tokenizer], state: State):
+                inner_ctx = state.ctx
+                global_ctx: const = ctx
+                inner_ctx.update((('tokens', tokens), ("state", state)))
+                local = constexpr[LocalContextProxy](global_ctx, inner_ctx)
+                return eval(constexpr[expr_code], global_ctx, local)
+        else:
+            stmts_code = compile(stmts, ctx.get('__filename__', '<when-clause::stmts>'), "exec")
+            expr_code = compile(expr, ctx.get('__filename__', '<when-clause::return>'), "eval")
+
+            @feature
+            def when_func(tokens: Sequence[Tokenizer], state: State):
+                inner_ctx = state.ctx
+                global_ctx: const = ctx
+                inner_ctx.update((('tokens', tokens), ("state", state)))
+                local = constexpr[LocalContextProxy](global_ctx, inner_ctx)
+                exec(constexpr[stmts_code], global_ctx, local)
+                return constexpr[eval](constexpr[expr_code], global_ctx, local)
+
     else:
         when_func = None
 
     with_ = a.with_ | IfNotNone(var_hook)
     if with_:
-        with_code = compile(with_, ctx.get('__filename__', '<input>'), 'exec')
+        stmts, expr = with_
+        if stmts is None:
+            expr_code = compile(expr, ctx.get('__filename__', '<with-clause::return>'), "eval")
 
-        def with_func(tokens, state):
-            ctx_view = Mapping1(tokens, state, ctx)
-            exec(with_code, ctx, ctx_view)
-            return ctx_view['__result__']
+            @feature
+            def with_func(tokens: Sequence[Tokenizer], state: State):
+                inner_ctx = state.ctx
+                global_ctx: const = ctx
+                inner_ctx.update((('tokens', tokens), ("state", state)))
+                local = constexpr[LocalContextProxy](global_ctx, inner_ctx)
+                return constexpr[eval](constexpr[expr_code], global_ctx, local)
 
+        else:
+            stmts_code = compile(stmts, ctx.get('__filename__', '<with-clause::stmts>'), "exec")
+            expr_code = compile(expr, ctx.get('__filename__', '<with-clause::return>'), "eval")
+
+            @feature
+            def with_func(tokens: Sequence[Tokenizer], state: State):
+                global_ctx: const = ctx
+                inner_ctx = state.ctx
+                inner_ctx.update((('tokens', tokens), ("state", state)))
+                local = constexpr[LocalContextProxy](global_ctx, inner_ctx)
+                exec(constexpr[stmts_code], global_ctx, local)
+                return constexpr[eval](constexpr[expr_code], global_ctx, local)
 
     else:
         with_func = None
 
     rewrite = a.rewrite | IfNotNone(var_hook)
     if rewrite:
-        rewrite_code = compile(rewrite, ctx.get('__filename__', '<input>'), 'exec')
+        stmts, expr = rewrite
+        if stmts is None:
+            expr_code = compile(expr, ctx.get('__filename__', '<rewrite-clause::return>'), "eval")
 
-        def rewrite_func(state):
-            ctx_view = Mapping2(state, ctx)
-            exec(rewrite_code, ctx, ctx_view)
-            return ctx_view['__result__']
+            @feature
+            def rewrite_func(state: State):
+                inner_ctx = state.ctx
+                inner_ctx['state'] = state
+                global_ctx: const = ctx
+                local = constexpr[LocalContextProxy](global_ctx, inner_ctx)
+                return constexpr[eval](constexpr[expr_code], local, local)
+        else:
+            stmts_code = compile(stmts, ctx.get('__filename__', '<rewrite-clause::stmts>'), "exec")
+            expr_code = compile(expr, ctx.get('__filename__', '<rewrite-clause::return>'), "eval")
 
+            @feature
+            def rewrite_func(state: State):
+                inner_ctx = state.ctx
+                inner_ctx['state'] = state
+                global_ctx: const = ctx
+                local = constexpr[LocalContextProxy](global_ctx, inner_ctx)
+                exec(constexpr[stmts_code], local, local)
+                return eval(constexpr[expr_code], local, local)
     else:
         rewrite_func = None
 

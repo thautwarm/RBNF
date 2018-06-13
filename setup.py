@@ -19,7 +19,7 @@ setup(name='rbnf',
       author='thautwarm',
       author_email='twshere@outlook.com',
       include_package_data=True,
-      packages=['rbnf'],
+      packages=['rbnf', 'rbnf.std', 'rbnf.AutoLexer', 'rbnf.zero'],
       install_requires=[
           'Redy'
       ],

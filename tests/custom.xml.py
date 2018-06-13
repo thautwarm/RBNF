@@ -10,9 +10,9 @@ XML ::=
     | '<' Name as t1 '/' '>'
     | '<' Name as t1 '>' (XML | ~('<' '/' Name '>'))* as seq '<' '/' Name as t2 '>'
     with
-        't2' not in state.ctx or t1.value == t2.value
+        not t2 or t1.value == t2.value
     rewrite
-        t1.value, seq if 'seq' in state.ctx else ()
+        t1.value, seq if seq else ()
 """
 
 asdl = parse(source_code)
@@ -22,6 +22,7 @@ visit(asdl, ctx)
 tokens = tuple(ctx['lex']('<abc> bcd </efg>'))
 state = State(ctx['lang'])
 result = ctx['XML'].match(tokens, state)
+print(result)
 assert result.status is Unmatched
 
 tokens = tuple(ctx['lex']('<abc>'
