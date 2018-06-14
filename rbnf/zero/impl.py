@@ -1,11 +1,17 @@
 from rbnf.std.compiler import *
+from Redy.Opt.ConstExpr import constexpr, const
+
+try:
+    from Redy.Opt.ConstExpr import feature
+except:
+    from Redy.Opt.ConstExpr import optimize as feature
 from .user_interface import ResultDescription
 
 __all__ = ['compile', 'ResultDescription']
 
 
 class ZeroExp:
-    def __init__(self, bnf_syntax: str, use: str):
+    def __init__(self, bnf_syntax: str, use: str, custom_lexer_wrapper=None):
         state = State(bootstrap)
         tokens = tuple(rbnf_lexing(bnf_syntax))
         result = Statements.match(tokens, state)
@@ -33,16 +39,17 @@ class ZeroExp:
         else:
             top_parser = ctx[use]
 
-        self._top_parser = top_parser
-        self._lang = lang
-        self._lexer = lexer
-        self.ctx = ctx
+        @feature
+        def match(text) -> ResultDescription:
+            _state = State(constexpr[lang])
+            _wrapper: const = custom_lexer_wrapper
+            _lexer: const = lexer
 
-    def match(self, text) -> ResultDescription:
-        _state = State(self._lang)
-        _tokens = tuple(self._lexer(text))
-        _result: Result = self._top_parser.match(_tokens, _state)
-        return ResultDescription(_state, _result.value, _tokens)
+            _tokens = tuple(_wrapper(_lexer(text)) if constexpr[custom_lexer_wrapper] else _lexer(text))
+            _result: Result = constexpr[top_parser.match](_tokens, _state)
+            return constexpr[ResultDescription](_state, _result.value, _tokens)
+
+        self.match = match
 
 
 def compile(bnf_syntax: str, use: str = None):
