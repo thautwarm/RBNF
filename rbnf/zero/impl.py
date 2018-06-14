@@ -52,6 +52,6 @@ class ZeroExp:
         self.match = match
 
 
-def compile(bnf_syntax: str, use: str = None):
+def compile(bnf_syntax: str, use: str = None, custom_lexer_wrapper=None):
     bnf_syntax = bnf_syntax
-    return ZeroExp(bnf_syntax, use)
+    return ZeroExp(bnf_syntax, use, custom_lexer_wrapper=custom_lexer_wrapper)
