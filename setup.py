@@ -1,6 +1,6 @@
 from setuptools import setup
 from Redy.Tools.Version import Version
-
+from Redy.Tools.PathLib import Path
 # with open('./README.rst', encoding='utf-8') as f:
 #     readme = f.read()
 readme = ''
@@ -18,8 +18,14 @@ setup(name='rbnf',
       url='https://github.com/thautwarm/Ruiko',
       author='thautwarm',
       author_email='twshere@outlook.com',
-      include_package_data=True,
       packages=['rbnf', 'rbnf.std', 'rbnf.AutoLexer', 'rbnf.zero'],
+      package_data={
+      	'rbnf_libs':[
+      		str(each) for each in 
+      			Path('./rbnf_libs')
+      			.collect(
+      				lambda path: path.endswith('.rbnf'))
+      		]},
       install_requires=[
           'Redy'
       ],
