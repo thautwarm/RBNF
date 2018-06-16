@@ -20,11 +20,9 @@ setup(name='rbnf',
       author_email='twshere@outlook.com',
       packages=['rbnf', 'rbnf.std', 'rbnf.AutoLexer', 'rbnf.zero'],
       package_data={
-      	'rbnf_libs':[
-      		str(each) for each in 
-      			Path('./rbnf_libs')
-      			.collect(
-      				lambda path: path.endswith('.rbnf'))
+      	'rbnf':[
+            'rbnf_libs/std/*.rbnf',
+            'rbnf_libs/*.rbnf'
       		]},
       install_requires=[
           'Redy'

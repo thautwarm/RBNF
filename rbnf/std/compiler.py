@@ -278,7 +278,7 @@ def var_hook(codes: str) -> Tuple[Optional[ast.Module], ast.Expression]:
         _expr = body.pop()
         expr = ast.Expression(_expr.value)
     else:
-        expr = ast.Expression(ast.NameConstant(linenoo=0, col_offset=0, value=None))
+        expr = ast.Expression(ast.NameConstant(lineno=0, col_offset=0, value=None))
     if not body:
         return None, expr
     return ast_module, expr
