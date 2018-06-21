@@ -342,19 +342,22 @@ def _seq_match(self: Composed, tokenizers: Sequence[Tokenizer], state: State) ->
     FAIL = 2
 
     _, parser, least, most = self
-    history = state.commit()
+    root_history = state.commit()
     nested = Nested()
 
     def foreach(times: int, _extend_fn, _append_fn):
         if times == most:
             return FINISH
+        history = state.commit()
         sub_res: Result = parser.match(tokenizers, state)
         if sub_res.status is Unmatched:
+            state.reset(history)
             if times >= least:
                 return FINISH
             return FAIL
         elif sub_res.status is FindLR:
             if least is 0:
+                state.reset(history)
                 warn(f"Left recursion supporting is ambiguous with repeatable parser({self}) that which couldn't fail.")
                 return FAIL
             return sub_res.value
@@ -376,7 +379,8 @@ def _seq_match(self: Composed, tokenizers: Sequence[Tokenizer], state: State) ->
             return Result(Matched, nested)
 
         elif status is FAIL:
-            state.reset(history)
+            if now:
+                state.reset(root_history)
             return Result.mismatched
 
         stacked_func = status
