@@ -1,0 +1,94 @@
+pyimport utils.[to_str]
+pyimport rbnf.Tokenizer.[Tokenizer]
+import std.common.[Space]
+ignore [Space]
+
+Name ::= '<Name>' (~'</Name>')* as Name_seq '</Name>'
+           rewrite
+                ('Name', to_str(Name_seq))
+
+DateTime ::= '<DataTime>' (~'</DataTime>')* as DateTime_seq '</DataTime>'
+           rewrite
+                ('DateTime', to_str(DateTime_seq))
+
+
+AQI ::= '<AQI>' (~'</AQI>')* as AQI_seq '</AQI>'
+           rewrite
+                ('AQI', to_str(AQI_seq))
+
+
+Level ::= '<Level>' (~'</Level>')* as Level_seq '</Level>'
+           rewrite
+                ('Level', to_str(Level_seq))
+
+LevelIndex ::= '<LevelIndex>' (~'</LevelIndex>')* as LevelIndex_seq '</LevelIndex>'
+           rewrite
+                ('LevelIndex', to_str(LevelIndex_seq))
+
+MaxPoll ::= '<MaxPoll>' (~'</MaxPoll>')* as MaxPoll_seq '</MaxPoll>'
+           rewrite
+                ('MaxPoll', to_str(MaxPoll_seq))
+
+
+Color ::= '<Color>' (~'</Color>')* as Color_seq '</Color>'
+           rewrite
+                ('Color', to_str(Color_seq))
+
+Intro ::= '<Intro>' (~'</Intro>')* as Intro_seq '</Intro>'
+           rewrite
+                ('Intro', to_str(Intro_seq))
+
+Tips ::= '<Tips>' (~'</Tips>')* as Tips_seq '</Tips>'
+           rewrite
+                ('Tips', to_str(Tips_seq))
+
+CLng ::= '<CLng>' (~'</CLng>')* as CLng_seq '</CLng>'
+           rewrite
+                ('CLng', to_str(CLng_seq))
+CLat ::= '<CLat>' (~'</CLat>')* as CLat_seq '</CLat>'
+           rewrite
+                ('CLat', to_str(CLat_seq))
+
+Field ::=
+        | Name
+        | DateTime
+        | AQI
+        | Level
+        | LevelIndex
+        | MaxPoll
+        | Color
+        | Intro
+        | Tips
+        | CLat
+        | CLng
+
+
+PointerMany ::= Pointer+ as seq
+                rewrite seq
+
+FieldMany   ::= Field+ as fields
+                rewrite
+                    {k: v for k, v in map(lambda it: it.item, fields)}
+
+Pointers ::= '<Pointers>' PointerMany as many '</Pointers>'
+            rewrite many
+
+Pointer ::= '<Pointer>' FieldMany as many '</Pointer>'
+            rewrite many
+
+
+City ::= '<City>' FieldMany as fields Pointers as pointers '</City>'
+        rewrite
+            fields['Pointers'] = pointers
+            fields
+
+LexerHelper := R'.'
+
+Test ::= (City | ~City)+ as seq
+          rewrite  tuple(each for each in seq if each.__class__ is not Tokenizer)
+
+
+
+
+
+
