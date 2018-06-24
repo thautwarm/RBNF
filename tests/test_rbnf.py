@@ -20,4 +20,4 @@ tokens = tuple(e for e in ctx['lex']('a b c 10 8') if e.name != 'Space')
 
 
 state = State(ctx['lang'])
-print(ctx['Z'].match(tokens, state))
+print(ctx['namespace']['Z'].match(tokens, state))

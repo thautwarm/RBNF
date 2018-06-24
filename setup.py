@@ -9,6 +9,9 @@ version_filename = 'next_version'
 with open(version_filename) as f:
     version = Version(f.read().strip())
 
+with Path("./rbnf/__release_info__.py").open('w') as f:
+    f.write('__VERSION__ = {}\n__AUTHOR__ = "thautwarm"'.format(repr(str(version))))
+
 setup(name='rbnf',
       version=str(version),
       keywords='parser-generator, context-sensitive, ebnf',
@@ -25,6 +28,7 @@ setup(name='rbnf',
             'rbnf_libs/*.rbnf'
       		]},
       install_requires=[
+          'linq-t>=0.1',
           'Redy'
       ],
       platforms='any',

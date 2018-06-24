@@ -21,7 +21,7 @@ visit(asdl, ctx)
 
 tokens = tuple(ctx['lex']('<abc> bcd </efg>'))
 state = State(ctx['lang'])
-result = ctx['XML'].match(tokens, state)
+result = ctx['namespace']['XML'].match(tokens, state)
 print(result)
 assert result.status is Unmatched
 
@@ -33,5 +33,5 @@ tokens = tuple(ctx['lex']('<abc>'
                           '<single/>'
                           '</abc> '))
 state = State(ctx['lang'])
-result = ctx['XML'].match(tokens, state)
+result = ctx['namespace']['XML'].match(tokens, state)
 print(result)

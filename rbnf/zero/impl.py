@@ -15,7 +15,7 @@ class ZeroExp:
         state = State(bootstrap)
         tokens = tuple(rbnf_lexing(bnf_syntax))
         result = Statements.match(tokens, state)
-        if result.status is Unmatched:
+        if result.status is Unmatched or state.end_index < len(tokens):
             max_fetched = state.max_fetched
             tk: Tokenizer = tokens[max_fetched]
             before = recover_codes(tokens[max_fetched - 10:max_fetched])
