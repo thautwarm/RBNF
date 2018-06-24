@@ -54,6 +54,17 @@ import builtins
 #                                             decorator_list=[], returns=None)])
 
 
+def _observe(asdls, ctx):
+    for each in asdls:
+        it = visit(each, ctx)
+        if it is None:
+            continue
+        if isinstance(each, ImportASDL):
+            yield from it
+        else:
+            yield it
+
+
 class LocalContextProxy(dict):
     def __len__(self) -> int:
         return len(self.local)
@@ -209,7 +220,7 @@ def visit(a: ImportASDL, ctx: dict):
             with path.open('r') as f:
                 text = f.read()
             asdl = parse(text)
-            yield from (visit(each, ctx) for each in asdl.value)
+            yield from _observe(asdl.value, ctx)
     else:
         err = NameError
         for path in paths:
@@ -233,7 +244,7 @@ def visit(a: ImportASDL, ctx: dict):
                 if any(ends):
                     names = ', '.join(ends)
                     raise NameError(f"Cannot found name(s) `{names}` at {path}.") from err
-                yield from (visit(each, ctx) for each in to_visits)
+                yield from _observe(to_visits, ctx)
                 return
             except NameError as err:
                 pass
@@ -401,25 +412,15 @@ def visit(a: ParserASDL, ctx: dict):
 
 @visit.case(StmtsASDL)
 def visit(a: StmtsASDL, ctx: dict):
-    async_objs = []
 
-    for each in a.value:
-        it = visit(each, ctx)
-        if isinstance(each, IgnoreASDL):
-            continue
-
-        if isinstance(each, ImportASDL):
-            try:
-                async_objs.extend(it)
-            except StopIteration:
-                pass
-        else:
-            async_objs.append(it)
-
+    async_objs = tuple(_observe(a.value, ctx))
+    # decide the namespace, hold the coroutines
     for each in async_objs:
-        name, parser = each.send(None)
+        it = each.send(None)
+        name, parser = it
         ctx['namespace'][name] = parser
 
+    # release the coroutines
     for each in async_objs:
         try:
             each.send(None)
