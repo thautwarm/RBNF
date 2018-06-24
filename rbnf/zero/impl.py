@@ -26,18 +26,19 @@ class ZeroExp:
         asdl = result.value
         ctx = create_ctx()
         visit(asdl, ctx)
-        lexer = ctx['lex']
-        lang = ctx['lang']
+
+        lexer, lang, namespace = map(ctx.__getitem__, ['lex', 'lang', 'namespace'])
+
         if use is None:
             for end in asdl.value[::-1]:
                 if isinstance(end, ParserASDL):
-                    top_parser = ctx[end.name]
+                    top_parser = namespace[end.name]
                     break
             else:
                 raise ValueError("No top parser found!")
 
         else:
-            top_parser = ctx[use]
+            top_parser = namespace[use]
 
         @feature
         def match(text) -> ResultDescription:

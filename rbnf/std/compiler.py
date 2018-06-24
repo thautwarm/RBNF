@@ -175,8 +175,12 @@ def visit(a: ImportASDL, ctx: dict):
             for each in a.import_items:
                 ctx[each] = new_ctx[each]
         return
+    paths = [Path('./')]
 
-    paths = [Path(os.environ.get('RBNF_HOME', './'))]
+    _home = Path(os.environ.get('RBNF_HOME', None))
+    if _home:
+        paths.append(_home)
+
     *headn, end = a.paths
 
     if headn:
@@ -196,36 +200,44 @@ def visit(a: ImportASDL, ctx: dict):
         action(new_paths, each_path)
     paths = new_paths
 
+    path: Path
+
     if not a.import_items:
         for path in paths:
+            if not path.exists():
+                continue
             with path.open('r') as f:
                 text = f.read()
             asdl = parse(text)
-            yield from (visit(each, ctx) for each in asdl.value if hasattr(each, 'name'))
-
-    elif len(paths) > 1:
-        raise ValueError("Cannot wildly import specific symbol.(import *.* [some])")
-
+            yield from (visit(each, ctx) for each in asdl.value)
     else:
-        path = paths[0]
-        with path.open('r') as f:
-            text = f.read()
-        for end in a.import_items:
-            if end in ctx:
-                raise ValueError(f"Duplicated symbol `{end}` in both current file and {path}.")
-        asdls = parse(text).value
-        ends = set(a.import_items)
-        to_visits = []
-        for each in asdls:
-            if hasattr(each, 'name') and each.name in ends:
-                to_visits.append(each)
-                # visit(each, ctx)
-                ends.remove(each.name)
-        if any(ends):
-            names = ', '.join(ends)
-            raise NameError(f"Cannot found name(s) `{names}` at {path}.")
+        err = NameError
+        for path in paths:
+            if not path.exists():
+                continue
+            try:
+                with path.open('r') as f:
+                    text = f.read()
+                for end in a.import_items:
+                    if end in ctx:
+                        raise ValueError(f"Duplicated symbol `{end}` in both current file and {path}.")
 
-        yield from (visit(each, ctx) for each in to_visits)
+                asdls = parse(text).value
+                ends = set(a.import_items)
+                to_visits = []
+                for each in asdls:
+                    if hasattr(each, 'name') and each.name in ends:
+                        to_visits.append(each)
+                        # visit(each, ctx)
+                        ends.remove(each.name)
+                if any(ends):
+                    names = ', '.join(ends)
+                    raise NameError(f"Cannot found name(s) `{names}` at {path}.") from err
+                yield from (visit(each, ctx) for each in to_visits)
+                return
+            except NameError as err:
+                pass
+        raise err
 
 
 def str_asdls_to_lexers(s: List[StrASDL], ctx: dict):
@@ -382,7 +394,7 @@ def visit(a: ParserASDL, ctx: dict):
 
     yield name, named
 
-    ctx[name] = named
+    ctx['namespace'][name] = named
     or_ = visit(a.or_, ctx)
     lang[named[1]] = or_
 
