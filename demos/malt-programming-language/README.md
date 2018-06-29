@@ -1,4 +1,4 @@
 
-See Project [RMalt](https://github.com/thautwarm/RBNF/tree/master/demos).
+See Project [RMalt](https://github.com/thautwarm/rmalt).
 
 You can just implement it in a super short time. 
