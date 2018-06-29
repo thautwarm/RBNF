@@ -1,0 +1,42 @@
+import std.common.[Number Space]
+pyimport functools.[reduce]
+pyimport asdl.[*]
+ignore [Space]
+
+Numeric ::= ['-' as neg] Number as integral ['.' Number as floating]
+            rewrite
+                r = float(integral.value + '.' + floating.value) if floating else int(integral.value)
+                Numeric(-r if neg else r)
+
+Pow ::= (Atom (('**' | '^') Atom)*) as seq
+        rewrite reduce(lambda a, b: Pow(a, b), seq[::2])
+
+Mul ::= Pow as head (('*' | '/' | '//' | '%') as op Pow)* as tail
+        rewrite
+            if tail:
+                op = None
+                for each in tail:
+                    if op is None:
+                        op = {
+                            '*' : Mul, '/' : Div, '//': FloorDiv, '%' : Mod
+                        }[each.value]
+                    else:
+                        head = op(head, each)
+                        op = None
+            head
+
+Add ::= Mul as head (('+' | '-') as op Mul)* as tail
+        rewrite
+            if tail:
+                op = None
+                for each in tail:
+                    if op is None:
+                        op = {'+': Add, '-': Sub}[each.value]
+                    else:
+                        head = op(head, each)
+                        op = None
+            head
+
+Atom ::= Numeric as value | '(' Add as value ')'
+         rewrite value
+
