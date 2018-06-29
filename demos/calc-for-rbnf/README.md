@@ -15,6 +15,10 @@ calc> (1 + 1) * 2 ^ 3
 HowTo
 ---------------
 
+```
+
 python 3.6
 pip install -U Redy rbnf
 python repl.py
+
+```
