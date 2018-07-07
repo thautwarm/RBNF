@@ -202,8 +202,7 @@ def _named_match(self: Atom, tokenizers: Sequence[Tokenizer], state: State):
         # find lr and state.lr_name is name
 
         with state.left_recursion():
-            original_ctx = state.ctx
-            state.ctx = original_ctx.copy()
+            original_ctx = state.ctx.copy()
 
             result: Result = parser.match(tokenizers, state)
             if result.status is Unmatched:
@@ -218,13 +217,14 @@ def _named_match(self: Atom, tokenizers: Sequence[Tokenizer], state: State):
             # stack jumping
             while True:
                 with state.leave_with_context_recovery():
-                    state.ctx = state.ctx.copy()
+                    state.ctx = original_ctx.copy()
                     res = stacked_func(head)
-                if res.status is Unmatched:
-                    break
+                    if res.status is Unmatched:
+                        break
 
-                # assert res.status is Matched
-                head = rewrite(state) if rewrite else Named(name, res.value)
+                    # assert res.status is Matched
+                    head = rewrite(state) if rewrite else Named(name, res.value)
+        
             result.value = head
             return result
 
