@@ -285,4 +285,4 @@ lexer_syntax = Name @ "name" + C('cast').optional @ "cast" + (C('as') + Name @ "
 bootstrap[DefLexer[1]] = optimize(lexer_syntax)
 
 bootstrap[Statement[1]] = Ignore @ "ignore" | Import @ "import" | DefParser @ "parser" | DefLexer @ "lexer"
-bootstrap[Statements[1]] = optimize(END.optional + (Statement + END.optional).unlimited @ "seq")
+bootstrap[Statements[1]] = optimize(END.unlimited + (Statement + END.unlimited).unlimited @ "seq")

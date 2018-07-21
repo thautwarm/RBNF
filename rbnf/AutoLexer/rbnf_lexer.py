@@ -11,15 +11,14 @@ _lexer_table: List[Tuple[str, Callable[[str, int], str]]] = [
     ("auto_const" | ToConst, char_lexer(('|', '{', '}', '[', ']', '(', ')', '+', '*', '.', ','))),
     ("auto_const" | ToConst, str_lexer(("::=", ":=", '<', '>', '/'))),
     ("Str" | ToConst, regex_lexer(re.compile(r'[A-Z]\'([^\\\']+|\\.)*?\'|\'([^\\\']+|\\.)*?\''))),
-    ('Comment' | ToConst, regex_lexer(re.compile(r'(#.*)|(((/\*)+?[\w\W]+?(\*/)+))'))),
     ("Name" | ToConst, regex_lexer("[a-zA-Z_\u4e00-\u9fa5][a-zA-Z0-9_\u4e00-\u9fa5]*")), ("Number", regex_lexer("\d+")),
-
-    ("Space" | ToConst, regex_lexer('\s+'))]
+    ("Space" | ToConst, regex_lexer('\s+')),
+    ('Comment' | ToConst, regex_lexer(re.compile(r'(#.*)|(((/\*)+?[\w\W]+?(\*/)+))'))),]
 
 _Space = "Space" | ToConst
 _END = "END" | ToConst
 _UNKNOWN = 'Unknown' | ToConst
-_DropTable = set(map(id, map(ConstStrPool.cast_to_const, ["Space"])))
+_DropTable = set(map(id, map(ConstStrPool.cast_to_const, ["Space" | ToConst, "Comment" | ToConst])))
 
 
 def rbnf_lexing(text: str):

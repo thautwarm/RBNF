@@ -20,8 +20,8 @@ class ZeroExp:
             tk: Tokenizer = tokens[max_fetched]
             before = recover_codes(tokens[max_fetched - 10:max_fetched])
             later = recover_codes(tokens[max_fetched: max_fetched + 10])
-            raise SyntaxError("Error at line {}, col {}, see details:\n{}", tk.lineno, tk.colno,
-                              Green(before) + Red(later))
+            raise SyntaxError(
+                "Error at line {}, col {}, see details:\n{}".format(tk.lineno, tk.colno, Green(before) + Red(later)))
 
         asdl = result.value
         ctx = create_ctx()

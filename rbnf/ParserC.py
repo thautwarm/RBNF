@@ -90,7 +90,7 @@ class Literal(Parser, ConsInd, traits.Dense, traits.Im):
     Invert: RDT[lambda literal: [[lambda token: not literal[1](token)], f'~{literal}']]
 
     def __str__(self):
-        return str(self.__inst_str__)
+        return str(self.__sig_str__)
 
     def match(self, tokenizers: Sequence[Tokenizer], state: State) -> Result:
         try:
@@ -224,7 +224,7 @@ def _named_match(self: Atom, tokenizers: Sequence[Tokenizer], state: State):
 
                     # assert res.status is Matched
                     head = rewrite(state) if rewrite else Named(name, res.value)
-        
+
             result.value = head
             return result
 
@@ -240,7 +240,7 @@ class Composed(Parser, ConsInd, traits.Dense, traits.Im):
     AnyNot: lambda which: f'not {which}'
 
     def __str__(self):
-        return self.__inst_str__
+        return self.__sig_str__
 
     @Pattern
     def match(self, tokenizers: Sequence[Tokenizer], state: State) -> Result:
