@@ -1,6 +1,6 @@
 from rbnf.std.rbnf_parser import *
 from rbnf.std.compiler import parse, visit, create_ctx
-
+from rbnf.ParserC import get_lexer_factors, get_binding_names
 asdls = parse("""
 Space := R'\s'
 Name := R'[a-zA-Z]+'
@@ -21,3 +21,5 @@ tokens = tuple(e for e in ctx['lex']('a b c 10 8') if e.name != 'Space')
 
 state = State(ctx['lang'])
 print(ctx['namespace']['Z'].match(tokens, state))
+print(list(get_lexer_factors(ctx['namespace']['Alpha'])))
+

@@ -4,10 +4,10 @@ from Redy.ADT.Core import RDT, data
 from .AST import *
 from .Result import *
 from .State import *
-
 from ._literal_matcher import *
 from Redy.Magic.Pattern import Pattern
 from warnings import warn
+import abc
 
 Context = dict
 LRFunc = Callable[[AST], Result]
@@ -22,10 +22,10 @@ class ConsInd(traits.Ind):  # index following constructing
         return self.__structure__[i] if self.__structure__ else self
 
 
-class Parser:
+class Parser(abc.ABC):
 
     def match(self, tokenizers: Sequence[Tokenizer], state: State) -> Result:
-        raise NotImplemented
+        return self.match(tokenizers, state)
 
     def repeat(self, least, most=-1) -> 'Parser':
         return self(least, most)
@@ -73,7 +73,9 @@ class Parser:
 @data
 class Literal(Parser, ConsInd, traits.Dense, traits.Im):
     # match by regex
-    # indeed it's stupid to use regex matching when parsing, however EBNFParser supplies everything.
+    # indeed it's stupid to use regex matching when parsing
+    # (but regex is suitable for constructing lexers),
+    # however RBNF supplies everything.
     R: RDT[lambda regex: [[make_regex_matcher(regex)], f'R{regex.__repr__()}']]
 
     # match by runtime string(equals)
@@ -87,7 +89,7 @@ class Literal(Parser, ConsInd, traits.Dense, traits.Im):
     NC: RDT[lambda name, const_string: [[make_name_and_const_str_matcher(name, const_string)],
                                         f'<{name}>{const_string.__repr__()}']]
 
-    Invert: RDT[lambda literal: [[lambda token: not literal[1](token)], f'~{literal}']]
+    Invert: RDT[lambda literal: [[make_invert(literal)], f'~{literal}']]
 
     def __str__(self):
         return str(self.__sig_str__)
@@ -110,9 +112,7 @@ class Literal(Parser, ConsInd, traits.Dense, traits.Im):
 @data
 class Atom(Parser, ConsInd, traits.Dense, traits.Im):
     Bind: lambda name, or_parser: f'({or_parser}) as {name}'
-    Named: RDT[
-        lambda ref_name, when, with_, rewrite: [[ConstStrPool.cast_to_const(ref_name), when, with_, rewrite], ref_name]]
-
+    Named: RDT[lambda ref_name: [[ConstStrPool.cast_to_const(ref_name)], ...]]
     Any: '_'
 
     @Pattern
@@ -156,12 +156,11 @@ def _bind_match(self: Atom, tokenizers: Sequence[Tokenizer], state: State):
 
 @Atom.match.case(Atom.Named)
 def _named_match(self: Atom, tokenizers: Sequence[Tokenizer], state: State):
-    _, name, when, with_, rewrite = self
+    _, name = self
     lang = state.lang
+    parser, when, with_, rewrite = lang[name]
     if when and not when(tokenizers, state):
         return Result.mismatched
-
-    parser: 'Composed.Or' = lang[name]
 
     if name in state:
         if state.lr_name:
@@ -238,6 +237,17 @@ class Composed(Parser, ConsInd, traits.Dense, traits.Im):
             ', '.join(f"({case.__repr__()} => {parser})" for case, parser in switch_cases.items()))
 
     AnyNot: lambda which: f'not {which}'
+
+    def get_names(self):
+        if self[0] is Composed.Jump:
+            for each in map(Parser.get_names, self[1].values()):
+                yield from each
+        elif self[0] is Composed.Seq:
+            yield from self[1].get_names()
+
+        else:
+            for each in map(Parser.get_names, self[1]):
+                yield from each
 
     def __str__(self):
         return self.__sig_str__

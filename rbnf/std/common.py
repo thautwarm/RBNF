@@ -1,3 +1,4 @@
+from Redy.Magic.Classic import cast
 from ..ParserC import Literal, Tokenizer
 from typing import Iterator
 
@@ -7,35 +8,55 @@ Str = N('Str')
 Number = N('Number')
 
 
-def recover_codes(tokens: Iterator[Tokenizer]):
+# noinspection PyTypeChecker
+@cast(''.join)
+def recover_codes(tokens: Iterator[Tokenizer]) -> str:
     """
     from a series of tokenizers to code string. (preserve the indentation)
     """
+
     tokens = iter(tokens)
 
     s = []
-    head = next(tokens)
+
+    try:
+        head = next(tokens)
+
+    except StopIteration:
+        return s
+
+    append = s.append
     lineno = head.lineno
+
     start_indent = colno = head.colno
-    s.append(head.value)
+
+    append(head.value)
+
     colno += len(s[-1])
+
     for each in tokens:
         n = each.lineno - lineno
+
         if n:
-            s.append('\n' * n)
+            append('\n' * n)
             lineno = each.lineno
             colno = each.colno
+
             if colno - start_indent > 0:
-                s.append(' ' * colno)
+                append(' ' * colno)
+
         else:
             c = each.colno - colno
             if c:
                 colno = each.colno
                 if c > 0:
-                    s.append(' ' * c)
-        s.append(each.value)
+                    append(' ' * c)
+
+        append(each.value)
+
         colno += len(s[-1])
-    return ''.join(s)
+
+    return s
 
 
 def underline_mangling(name: str):
