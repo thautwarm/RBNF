@@ -7,11 +7,13 @@ from rbnf._literal_matcher import *
 from rbnf.Optimize import optimize
 from typing import Sequence
 from Redy.Opt import get_ast
+from linq import Flow as seq
 import abc
 import ast
 import typing
 import types
-from linq import Flow as seq
+import textwrap
+import builtins
 
 _internal_macro = Macro()
 staging = (const, constexpr)
@@ -20,6 +22,17 @@ staging = (const, constexpr)
 class _AutoContext:
     def __init__(self, fn):
         self.fn = fn
+
+
+class FnCodeStr(typing.NamedTuple):
+    code: str
+    lineno: int
+    colno: int
+    filename: str
+    namespace: dict
+
+    fn_name = None
+    fn_args = "tokens", "state"
 
 
 def auto_context(fn):
@@ -33,18 +46,38 @@ def process(fn, bound_names):
     if not bound_names:
         return fn
 
-    code = fn.__code__
+    if isinstance(fn, FnCodeStr):
+        assign_code_str = "ctx = state.ctx\n" + "\n".join("{0} = ctx.get({0!r})".format(name) for name in bound_names)
+        code = "def {0}({1}):\n{2}".format(fn.fn_name, ", ".join(fn.fn_args),
+                                           textwrap.indent(f'{assign_code_str}\n{fn.code}', " " * 4))
+        module_ast = ast.parse(code, fn.filename)
 
-    assigns = ast.parse("ctx = state.ctx\n" + "\n".join("{0} = ctx.get({0!r})".format(name) for name in bound_names))
-    module_ast = get_ast(fn.__code__)
-    fn_ast: ast.FunctionDef = module_ast.body[0]
-    fn_ast.body = assigns.body + fn_ast.body
-    code_object = compile(ast.Module([fn_ast]), code.co_filename, "exec")
+        module_ast = ast.increment_lineno(module_ast, fn.lineno)
+        filename = fn.filename
+        name = fn.fn_name
+        __defaults__ = None
+        __closure__ = None
+        __globals__ = fn.namespace
+
+    else:
+        code = fn.__code__
+        assigns = ast.parse(
+            "ctx = state.ctx\n" + "\n".join("{0} = ctx.get({0!r})".format(name) for name in bound_names))
+        module_ast = get_ast(fn.__code__)
+        fn_ast: ast.FunctionDef = module_ast.body[0]
+        fn_ast.body = assigns.body + fn_ast.body
+        module_ast = ast.Module([fn_ast])
+        filename = code.co_filename
+        name = code.co_name
+        __defaults__ = fn.__defaults__
+        __closure__ = fn.__closure__
+        __globals__ = fn.__globals__
+
+    code_object = compile(module_ast, filename, "exec")
     code_object = next(
-        each for each in code_object.co_consts if isinstance(each, types.CodeType) and each.co_name == code.co_name)
-
-    # noinspection PyArgumentList
-    return types.FunctionType(code_object, fn.__globals__, fn.__name__, fn.__defaults__, fn.__closure__)
+        each for each in code_object.co_consts if isinstance(each, types.CodeType) and each.co_name == name)
+    # noinspection PyArgumentList,PyUnboundLocalVariable
+    return types.FunctionType(code_object, __globals__, name, __defaults__, __closure__)
 
 
 class Parser(abc.ABC):
@@ -100,6 +133,8 @@ LexerFactor = typing.Union[RegexLexerFactor, ConstantLexerFactor]
 class Language:
     def __init__(self, name):
         self.lang_name = name
+        self.named_parsers = {}
+        self.namespace = {**builtins.__dict__}
         self.implementation = {}
         self.lexer_makers: typing.List[Lexer] = []
         self.lazy_def_parsers: typing.List[Parser] = []
@@ -124,13 +159,15 @@ class Language:
 
         else:
             raise TypeError
+
+        self.named_parsers[cls.__name__] = ret
         return ret
 
     def ignore(self, *ignore_lst: str):
         """
         ignore a set of tokens with specific names
         """
-        self.ignore_lst.extend(ignore_lst)
+        self.ignore_lst.extend(map(lambda _: id(ConstStrPool.cast_to_const(_)), ignore_lst))
 
     def build(self):
         def _process(fn, binding_names):
@@ -169,8 +206,7 @@ class Language:
         lang = self.implementation
 
         for cls in self.lazy_def_parsers:
-            implementation: ParserC.Parser = optimize(cls.bnf())
-
+            implementation: ParserC.Parser = cls.bnf()
             lexer_factors.extend(get_lexer_factors(implementation))
 
             binding_names = get_binding_names(implementation)
@@ -191,21 +227,28 @@ class Language:
                 for each in members:
                     yield from each.factors
 
-            return ty(name, tuple(stream()))
+            factors = stream()
+            if ty is ConstantLexerFactor:
+                factors = sorted(factors, reverse=True)
+            else:
+                factors = tuple(factors)
+            return ty(name, factors)
 
-        lexer_table = seq(lexer_factors).chunk_by(f1).map(f2).map(lambda it: it.to_lexer()).to_tuple()._
+        lexer_table = seq(lexer_factors).chunk_by(f1).map(f2).map(lambda it: it.to_lexer()).to_list()._
 
         @feature(staging)
         def filter_token(tk: Tokenizer):
-            return constexpr[id](tk.name) in constexpr[self.ignore_lst]
+            return constexpr[id](tk.name) not in constexpr[self.ignore_lst]
 
         @feature(staging)
         def lexer(text: str):
             ignore_lst: const = self.ignore_lst
-            result = constexpr[lexing](text, constexpr[lexer_table], cast_map if constexpr[cast_map] else None)
+            cm: const = cast_map
+
+            result = constexpr[lexing](text, constexpr[lexer_table], cm if constexpr[cm] else None)
             if constexpr[ignore_lst]:
-                return result
-            else:
                 return filter(constexpr[filter_token], result)
+            else:
+                return result
 
         self.lexer = lexer

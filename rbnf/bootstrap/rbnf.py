@@ -1,6 +1,7 @@
 import operator
 from functools import reduce
 
+from rbnf.AutoLexer import rbnf_lexer
 from rbnf.Optimize import optimize
 from rbnf.edsl import *
 from rbnf.ParserC import Literal, Atom as _Atom, State, Tokenizer, ConstStrPool
@@ -41,64 +42,83 @@ class CodeItem(Parser):
         return token.colno > begin_sign.colno
 
 
+class RewriteCode(FnCodeStr):
+    fn_args = "state"
+    fn_name = "rewrite"
+
+
+class WhenCode(FnCodeStr):
+    fn_args = "tokens", "state"
+    fn_name = "when"
+
+
+class WithCode(FnCodeStr):
+    fn_args = "tokens", "state"
+    fn_name = "fail_if"
+
+
 class Guide(Parser):
-    class Data(typing.NamedTuple):
-        code: str
-        lineno: int
-        colno: int
-        filename: str
+    out_cls = FnCodeStr
 
     @classmethod
     def bnf(cls):
-        return C(cls.__name__.lower()) @ "sign" + CodeItem.one_or_more @ "expr"
+        return optimize(C(cls.__name__.lower()) @ "sign" + CodeItem.one_or_more @ "expr")
 
     @classmethod
     @auto_context
     def rewrite(cls, state: State):
         ctx = state.ctx
         code_items: ParserC.Nested = ctx['expr']
-        first = code_items[0]
+        first = code_items[0].item
         code = recover_codes(each.item for each in code_items)
-        return cls.Data(code, first.lineno, first.colno, state.filename)
+        # noinspection PyArgumentList
+        return cls.out_cls(code, first.lineno, first.colno, state.filename, state.data.namespace)
 
 
 @rbnf
 class With(Guide):
+    out_cls = WithCode
     pass
 
 
 @rbnf
 class When(Guide):
+    out_cls = WhenCode
     pass
 
 
 @rbnf
 class Rewrite(Guide):
+    out_cls = RewriteCode
     pass
 
 
 @rbnf
 class Primitive(Parser):
 
+    @classmethod
     def bnf(cls):
         # @formatter:off
-        return ( C('(') + Or @ "or_" + C(')')
+        return optimize(
+                 C('(') + Or @ "or_" + C(')')
                | C('[') + Or @ "optional" + C(']')
                | Name @ "name"
                | Str  @ "str")
         # @formatter:on
 
+    @classmethod
     def rewrite(cls, state: State):
-        or_: Parser
+        get = state.ctx.get
+        or_: Parser = get('or_')
 
-        optional: Parser
+        optional: Parser = get('optional')
 
-        name: Tokenizer
+        name: Tokenizer = get('name')
 
-        str: Tokenizer
+        str: Tokenizer = get('str')
 
         if name:
-            return cls.lang.namespace[name.value]
+            return state.data.named_parsers[name.value]
         if or_:
             return or_
         if optional:
@@ -122,9 +142,11 @@ class Primitive(Parser):
 @rbnf
 class Trail(Parser):
 
+    @classmethod
     def bnf(cls):
         # @formatter:off
-        return ((C('~') @ "rev" + Primitive @ "atom"
+        return optimize(
+                (C('~') @ "rev" + Primitive @ "atom"
                  | Primitive @ "atom"
                     +  ( C('+') @ "one_or_more"
                        | C('*') @ "zero_or_more"
@@ -135,6 +157,8 @@ class Trail(Parser):
                      ).optional)
         # @formatter:on
 
+    @classmethod
+    @auto_context
     def rewrite(cls, state: State):
         rev: object
         atom: ParserC.Parser
@@ -172,12 +196,13 @@ class Trail(Parser):
                 ctx['name'] = ret
                 ret = ret @ name
 
-        return ret
+        return optimize(ret)
 
 
 @rbnf
 class And(Parser):
 
+    @classmethod
     def bnf(cls):
         return Trail.one_or_more @ "and_seq"
 
@@ -191,20 +216,25 @@ class And(Parser):
 @rbnf
 class Or(Parser):
 
+    @classmethod
     def bnf(cls):
-        return optimize(And @ "head" + (C('|') + And >> "tail").unlimited)
+        return optimize(And @ "head" + (C('|') + (And >> "tail")).unlimited)
 
     @classmethod
     @auto_context
     def rewrite(cls, state: State):
         tail: ParserC.Nested
         head: ParserC.Parser
-        return reduce(operator.or_, tail, head)
+        if not tail:
+            return head
+
+        return optimize(reduce(operator.or_, tail, head))
 
 
 @rbnf
 class Import(Parser):
 
+    @classmethod
     def bnf(cls):
         # @formatter:off
         return optimize(
@@ -215,16 +245,22 @@ class Import(Parser):
                     +  C('.') + C('[') + (C('*') | Name.unlimited @ "import_items") + C(']'))
         # @formatter:on
 
-    def rewrite(cls, state: State):
-        language: Tokenizer
-        head: Tokenizer
-        tail: typing.List[Tokenizer]
-        import_items: typing.List[Tokenizer]
-        raise NotImplemented
+
+"""
+    # def rewrite(state: State):
+    #     language: Tokenizer
+    #     head: Tokenizer
+    #     tail: typing.List[Tokenizer]
+    #     import_items: typing.List[Tokenizer]
+    #     raise NotImplemented
+
+"""
 
 
 @rbnf
 class Ignore(Parser):
+
+    @classmethod
     def bnf(cls):
         return optimize(C("ignore") + C('[') + Name.one_or_more @ "names" + C(']'))
 
@@ -232,12 +268,14 @@ class Ignore(Parser):
     @auto_context
     def rewrite(cls, state: State):
         names: typing.List[Tokenizer]
-        raise NotImplemented
+        lang: Language = state.data
+        lang.ignore_lst.extend(id(ConstStrPool.cast_to_const(each.value)) for each in names)
 
 
 @rbnf
 class UParser(Parser):
 
+    @classmethod
     def bnf(cls):
         # @formatter:off
         return optimize(Name @ "name" + C('::=')
@@ -260,11 +298,11 @@ class UParser(Parser):
 
         methods = {}
         if when:
-            methods['when'] = when
+            methods['when'] = when[0]
         if fail_if:
-            methods['fail_if'] = fail_if
+            methods['fail_if'] = fail_if[0]
         if rewrite:
-            methods['rewrite'] = rewrite
+            methods['rewrite'] = rewrite[0]
 
         methods['bnf'] = lambda: impl
         lang(type(name.value, (Parser,), methods))
@@ -273,13 +311,14 @@ class UParser(Parser):
 @rbnf
 class ULexer(Parser):
 
+    @classmethod
     def bnf(cls):
         # @formatter:off
         return optimize(
             Name @ "name" + C('cast').optional @ "cast"
-            + (C('as') + Name @ "new prefix").optional
-            + C(':=')
-            + C('|').optional + Str.one_or_more @ "lexer_factors")
+            + (C('as') + Name @ "new_prefix").optional
+            +  C(':=')
+            +  C('|').optional + Str.one_or_more @ "lexer_factors")
         # @formatter:on
 
     @classmethod
@@ -294,13 +333,15 @@ class ULexer(Parser):
         def split_regex_and_constants(tk: Tokenizer):
             v = tk.value
             if v.startswith("R'"):
-                return "Regex"
+                return "regex"
             elif v.startswith("'"):
-                return "Constant"
+                return "constants"
             raise ValueError(f"Unexpected prefixed string `{v}` at lineno {tk.lineno}, column {tk.colno}.")
 
         lexer_groups = seq(lexer_factors).group_by(split_regex_and_constants)._
         regex, constants = (lexer_groups[each] for each in ('regex', 'constants'))
+        regex = [each[2:-1] for each in seq(regex).map(lambda _: _.value)._]
+        constants = [each[1:-1] for each in seq(constants).map(lambda _: _.value)._]
 
         methods = {'regex': lambda: regex, 'constants': lambda: constants}
         if cast:
@@ -314,6 +355,7 @@ class ULexer(Parser):
 @rbnf
 class Statement(Parser):
 
+    @classmethod
     def bnf(cls):
         return Import @ "import_" | UParser @ "parser" | ULexer @ "lexer" | Ignore @ 'ignore'
 
@@ -321,13 +363,19 @@ class Statement(Parser):
 @rbnf
 class Grammar(Parser):
 
+    @classmethod
     def bnf(cls):
-        return optimize(END.unlimited + (Statement >> "seq" + END.unlimited).unlimited)
+        return optimize(END.unlimited + (Statement + END.unlimited).unlimited)
 
     @classmethod
     def when(cls, tokens, state):
         state.data = Language(state.filename[:-5])
+        return True
 
     @classmethod
     def rewrite(cls, state: State):
         return state.data
+
+
+rbnf.build()
+rbnf.lexer = rbnf_lexer.rbnf_lexing

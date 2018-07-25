@@ -3,7 +3,7 @@ from rbnf import ParserC
 import abc
 import typing
 
-__all__ = ['Parser', 'Lexer', 'Language', 'auto_context']
+__all__ = ['Parser', 'Lexer', 'Language', 'auto_context', 'FnCodeStr']
 
 
 class AutoContext:
@@ -11,6 +11,16 @@ class AutoContext:
 
 
 def auto_context(fn) -> AutoContext: ...
+
+
+class FnCodeStr(typing.NamedTuple):
+    code: str
+    lineno: int
+    colno: int
+    filename: str
+    namespace: dict
+    fn_args = "tokens", "state"
+    fn_name = ""
 
 
 class _ParserLike(abc.ABC):
@@ -104,8 +114,13 @@ class Lexer(_ParserLike):
 
 class Language:
     lexer: Callable[[str], Sequence[Tokenizer]]
-    implementation: typing.Dict[str, typing.Union[Atom.Named, Literal.N]]
+    named_parsers: typing.Dict[str, typing.Union[Atom.Named, Literal.N]]
+    implementation: typing.Dict[str, ParserC.Parser]
     prefix: typing.Dict[str, str]
+
+    lang_name: str
+    namespace = {}
+    ignore_lst = []
 
     def __init__(self, lang_name: str): ...
 

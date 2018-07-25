@@ -10,8 +10,8 @@ class RegexLexerFactor(typing.NamedTuple):
     factors: typing.List[str]
 
     def to_lexer(self):
-        print(self.name, self.factors)
-        return self.name, regex_lexer(self.factors)
+        print("making regex lexers:", self.name, self.factors)
+        return ConstStrPool.cast_to_const(self.name), regex_lexer(self.factors)
 
 
 class ConstantLexerFactor(typing.NamedTuple):
@@ -19,8 +19,8 @@ class ConstantLexerFactor(typing.NamedTuple):
     factors: typing.List[str]
 
     def to_lexer(self):
-        print(self.name, self.factors)
-        return self.name, str_lexer(self.factors)
+        print("making constant lexers: ", self.name, self.factors)
+        return ConstStrPool.cast_to_const(self.name), str_lexer(self.factors)
 
 
 def get_lexer_factors(parser: 'Parser') -> typing.Generator[
@@ -31,7 +31,7 @@ def get_lexer_factors(parser: 'Parser') -> typing.Generator[
             yield RegexLexerFactor(a, [b])
 
         elif lit[0] in (Literal.C, Literal.NC):
-            a, b = lit[1]
+            a, b = lit[1].raw
             yield ConstantLexerFactor(a, [b])
 
         else:

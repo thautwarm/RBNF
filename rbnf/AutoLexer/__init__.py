@@ -11,6 +11,8 @@ import re
 @singleton
 class ToConst:
     def __ror__(self, item: str):
+        if isinstance(item, (tuple, list)):
+            return item.__class__(ConstStrPool.cast_to_const(each) for each in item)
         return ConstStrPool.cast_to_const(item)
 
 
@@ -82,6 +84,7 @@ def lexing(text: str, lexer_table: StrLexerTable, cast_map: CastMap = None):
     pos = 0
     newline = '\n'
     cast_const = ConstStrPool.cast_to_const
+
     while True:
         if text_length <= pos:
             break
@@ -219,6 +222,7 @@ def str_lexer(mode):
     generate token strings' cache
     """
     cast_to_const = ConstStrPool.cast_to_const
+
     def f_raw(inp_str, pos):
         return cast_to_const(mode) if inp_str.startswith(mode, pos) else None
 

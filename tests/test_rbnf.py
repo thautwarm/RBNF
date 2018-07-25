@@ -1,25 +1,32 @@
-from rbnf.std.rbnf_parser import *
-from rbnf.std.compiler import parse, visit, create_ctx
-from rbnf.ParserC import get_lexer_factors, get_binding_names
-asdls = parse("""
+codes = ("""
+ignore[Space]
 Space := R'\s'
 Name := R'[a-zA-Z]+'
+Num := R'\d+'
 Alpha cast := 'a' 'b' 'c'
 
-Num := R'\d+'
 Z ::= Alpha+ Num as n1 Num as n2
-    with
-        d1 = int(n1.value)
-        d2 = int(n2.value)
-        d1 > d2
+        with
+            d1 = int(n1.value)
+            d2 = int(n2.value)
+            return d1 > d2
 """)
+from rbnf.State import State
+from rbnf.bootstrap.rbnf import Grammar, rbnf, Language
 
-ctx = create_ctx()
-visit(asdls, ctx)
-tokens = tuple(e for e in ctx['lex']('a b c 10 8') if e.name != 'Space')
+state = State(rbnf.implementation)
+state.data = Language("mylang")
+state.filename = __file__
+tokens = tuple(rbnf.lexer(codes))
+Grammar.match(tokens, state)
+ULexer = rbnf.implementation['ULexer'][0]
 
+mylang = state.data
+#
+mylang.build()
+#
+tokens = list(mylang.lexer("a b c 10 8"))
 
-state = State(ctx['lang'])
-print(ctx['namespace']['Z'].match(tokens, state))
-print(list(get_lexer_factors(ctx['namespace']['Alpha'])))
-
+state = State(mylang.implementation)
+print(mylang.implementation['Z'])
+print(mylang.named_parsers['Z'].match(tokens, state))
