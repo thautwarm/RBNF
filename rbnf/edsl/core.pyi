@@ -1,9 +1,20 @@
 from rbnf.ParserC import *
+from rbnf import ParserC
+import abc
+import typing
 
-__all__ = ['Parser', 'Lexer']
+__all__ = ['Parser', 'Lexer', 'Language', 'auto_context']
+
+
+class AutoContext:
+    fn: 'function'
+
+
+def auto_context(fn) -> AutoContext: ...
 
 
 class _ParserLike(abc.ABC):
+    lang: Language
 
     def match(self, tokenizers: Sequence[Tokenizer], state: State) -> Result:
         return self.match(tokenizers, state)
@@ -29,6 +40,8 @@ class _ParserLike(abc.ABC):
     def __invert__(self):
         return Composed.AnyNot(self)
 
+    def __rshift__(self, other: str) -> Parser: ...
+
     def __matmul__(self, other: str):
         return Atom.Bind(other, self)
 
@@ -52,52 +65,50 @@ class _ParserLike(abc.ABC):
 
 
 class Parser(_ParserLike):
-    @staticmethod
-    @abc.abstractmethod
-    def bnf():
+
+    @classmethod
+    def bnf(cls):
         raise NotImplemented
 
-    @staticmethod
-    @abc.abstractmethod
-    def rewrite(state: State):
+    @classmethod
+    def rewrite(cls, state: State):
         raise NotImplemented
 
-    @staticmethod
-    @abc.abstractmethod
-    def when(tokens: Sequence[Tokenizer], state: State):
+    @classmethod
+    def when(cls, tokens: Sequence[Tokenizer], state: State):
         raise NotImplemented
 
-    @staticmethod
-    @abc.abstractmethod
-    def fail_if(tokens: Sequence[Tokenizer], state: State):
+    @classmethod
+    def fail_if(cls, tokens: Sequence[Tokenizer], state: State):
         raise NotImplemented
-
-    pass
 
 
 class Lexer(_ParserLike):
-    @staticmethod
-    @abc.abstractmethod
-    def regex() -> typing.Sequence[str]:
+
+    @classmethod
+    def regex(cls) -> typing.Sequence[str]:
         return []
 
-    @staticmethod
-    @abc.abstractmethod
-    def constants() -> typing.Sequence[str]:
+    @classmethod
+    def constants(cls) -> typing.Sequence[str]:
         return []
 
-    @staticmethod
-    @abc.abstractmethod
-    def cast() -> bool:
+    @classmethod
+    def cast(cls) -> bool:
         return False
 
-    pass
+    @classmethod
+    def prefix(cls) -> typing.Optional[str]:
+        return None
 
 
-class Lang:
+class Language:
     lexer: Callable[[str], Sequence[Tokenizer]]
-    namespace: dict
+    implementation: typing.Dict[str, typing.Union[Atom.Named, Literal.N]]
+    prefix: typing.Dict[str, str]
 
     def __init__(self, lang_name: str): ...
+
+    def __call__(self, *args, **kwargs) -> ParserC.Parser: ...
 
     def build(self): ...

@@ -1,25 +1,32 @@
 import typing
 
-from rbnf.std.edsl import Parser, Lexer, Language
+from rbnf.State import State
+from rbnf.edsl import Parser, Lexer, Language, auto_context
 
 lang = Language("number take")
 
 
 @lang
 class S12(Lexer):
-    @staticmethod
-    def constants() -> typing.Sequence[str]:
+    @classmethod
+    def constants(cls) -> typing.Sequence[str]:
         return ["1", "2"]
 
 
 @lang
 class X(Parser):
 
-    @staticmethod
-    def bnf():
-        return S12 + S12
+    @classmethod
+    def bnf(cls):
+        return (S12 >> "f")(1, -1)
+
+    @classmethod
+    @auto_context
+    def rewrite(cls, state: State):
+        f: list
+        return f
 
 
 lang.build()
 print(list(lang.lexer("122")))
-
+print(X.match(tuple(lang.lexer("12")), State(lang.implementation)))

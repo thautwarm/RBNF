@@ -45,6 +45,9 @@ class Parser(abc.ABC):
     def __call__(self, least, most=-1) -> 'Parser':
         return Composed.Seq(self, least, most)
 
+    def __rshift__(self, other: str):
+        return Atom.Push(other, self)
+
     def __invert__(self):
         return Composed.AnyNot(self)
 
@@ -112,6 +115,7 @@ class Literal(Parser, ConsInd, traits.Dense, traits.Im):
 @data
 class Atom(Parser, ConsInd, traits.Dense, traits.Im):
     Bind: lambda name, or_parser: f'({or_parser}) as {name}'
+    Push: lambda name, or_parser: f'({or_parser}) to {name}'
     Named: RDT[lambda ref_name: [[ConstStrPool.cast_to_const(ref_name)], ...]]
     Any: '_'
 
@@ -151,6 +155,34 @@ def _bind_match(self: Atom, tokenizers: Sequence[Tokenizer], state: State):
         ctx = state.ctx = state.ctx.copy()
         ctx[name] = result.value
 
+    return result
+
+@Atom.match.case(Atom.Push)
+def _push_match(self: Atom, tokenizers: Sequence[Tokenizer], state: State):
+    _, name, parser = self
+    result = parser.match(tokenizers, state)
+
+    if result.status is FindLR:
+        stacked_func: LRFunc = result.value
+
+        def stacked_func_(ast: AST):
+            stacked_result = stacked_func(ast)
+            if stacked_result.status is Matched:
+                state.ctx = state.ctx.copy()
+                try:
+                    state.ctx[name].append(stacked_result.value)
+                except KeyError:
+                    state.ctx[name] = [stacked_result.value]
+            return stacked_result
+
+        return Result.find_lr(stacked_func_)
+
+    elif result.status is Matched:
+        ctx = state.ctx = state.ctx.copy()
+        try:
+            ctx[name].append(result.value)
+        except KeyError:
+            ctx[name] = [result.value]
     return result
 
 

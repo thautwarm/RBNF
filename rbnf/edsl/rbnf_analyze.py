@@ -40,6 +40,8 @@ def get_lexer_factors(parser: 'Parser') -> typing.Generator[
     def for_atom(atom: Atom):
         if Atom.Bind is atom[0]:
             yield from get_lexer_factors(atom[2])
+        if Atom.Push is atom[0]:
+            yield from get_lexer_factors(atom[2])
         return
 
     def for_composed(comp: Composed):
@@ -64,6 +66,8 @@ def get_binding_names(parser: 'Parser') -> typing.Generator[str, None, None]:
 
     def for_atom(atom: Atom):
         if Atom.Bind is atom[0]:
+            return atom[1],
+        if Atom.Push is atom[0]:
             return atom[1],
         return ()
 

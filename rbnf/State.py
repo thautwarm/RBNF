@@ -43,10 +43,12 @@ class State(Generic[T]):
 
     _new_one_factory: Callable[[], Trace[T]]
 
-    def __init__(self, lang):
+    def __init__(self, lang, filename=None):
         self.lang = lang
         self.lr_name = None
+        self.filename = filename
         self.ctx = {}
+        self.data = None
 
         self.trace = Trace()
         self.trace.append(Trace())

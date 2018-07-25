@@ -401,18 +401,17 @@ def visit(a: ParserASDL, ctx: dict):
     else:
         rewrite_func = None
 
-    named = PAtom.Named(name, when_func, with_func, rewrite_func)
+    named = PAtom.Named(name)
 
     yield name, named
 
     ctx['namespace'][name] = named
     or_ = visit(a.or_, ctx)
-    lang[named[1]] = or_
+    lang[named[1]] = or_, when_func, with_func, rewrite_func
 
 
 @visit.case(StmtsASDL)
 def visit(a: StmtsASDL, ctx: dict):
-
     async_objs = tuple(_observe(a.value, ctx))
     # decide the namespace, hold the coroutines
     for each in async_objs:
