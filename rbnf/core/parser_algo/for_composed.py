@@ -34,7 +34,7 @@ def as_fixed(self, lang):
 
     @feature(staging)
     def not_match(tokenizers, state):
-        match: const = which_
+        match: const = which_.match
         history = state.commit()
         if match(tokenizers, state).status is constexpr[Unmatched]:
             state.reset(history)
@@ -121,14 +121,14 @@ def as_fixed(self, lang):
     def and_match(tokenizers, state):
         match_fns: const = match_fns_
         history = state.commit()
-        nested = Nested()
+        nested = constexpr[Nested]()
         nested_extend = nested.extend
         nested_append = nested.append
         # no tco here, so I have to repeat myself.
-        for i in range(len(match_fns)):
-            match = match_fns_[i]
+        for i in constexpr[range](constexpr[len](match_fns)):
+            match = match_fns[i]
             each_result = match(tokenizers, state)
-            if each_result.status is Unmatched:
+            if each_result.status is constexpr[Unmatched]:
                 state.reset(history)
                 return constexpr[Result.mismatched]
 
@@ -141,7 +141,6 @@ def as_fixed(self, lang):
                 continue
             else:
                 stacked_func = each_result.value
-
                 match_fns__ = match_fns
 
                 def stacked_func_(ast):
@@ -207,13 +206,14 @@ def as_fixed(self, lang):
         history = state.commit()
         for match in match_fns:
             result = match(tokenizers, state)
-            if result.status is not Unmatched:
+
+            if result.status is not constexpr[Unmatched]:
                 return result
 
             state.reset(history)
             continue
-
-        return constexpr[Result.mismatched]
+        x = constexpr[Result.mismatched]
+        return x
 
     self.match = or_match
 
@@ -301,16 +301,18 @@ def as_fixed(self, lang):
         label_finish: label
         label_fail: label
         label_lr: label
+        label_return: label
 
         FINISH: const = 0
         CONTINUE: const = 1
         FAIL: const = 2
+
         match: const = parser_.match
         least: const = least_
         most: const = most_
 
         root_history = state.commit()
-        nested = Nested()
+        nested = constexpr[Nested]()
 
         now = 0
         _extend_fn = nested.extend
@@ -355,38 +357,37 @@ def as_fixed(self, lang):
         loop.jump()
 
         with label_finish:
-            return constexpr[Result](constexpr[Matched], nested)
+            ret = constexpr[Result](constexpr[Matched], nested)
+            label_return.jump()
 
         with label_fail:
             if now:
                 state.reset(root_history)
 
-            return constexpr[Result.mismatched]
+            ret = constexpr[Result.mismatched]
+            label_return.jump()
 
         with label_lr:
             match__ = match
-
-            FINISH_, CONTINUE_, FAIL_ = FINISH_, CONTINUE_, FAIL
-
-            state_ = state
+            FINISH_, CONTINUE_, FAIL_ = FINISH, CONTINUE, FAIL
 
             def stacked_func_(ast: AST):
                 def foreach(times: int, _extend_fn, _append_fn):
                     if times == most_:
                         return FINISH_
-                    history = state_.commit()
-                    sub_res = match__(tokenizers, state_)
+                    history = state.commit()
+                    sub_res = match__(tokenizers, state)
                     if sub_res.status is Unmatched:
-                        state_.reset(history)
+                        state.reset(history)
                         if times >= least_:
                             return FINISH_
                         return FAIL_
 
                     elif sub_res.status is FindLR:
                         if least_ is 0:
-                            state_.reset(history)
-                            warnings.warn(
-                                f"Left recursion supporting is ambiguous with repeatable parser({self}) that which couldn't fail.")
+                            state.reset(history)
+                            warnings.warn(f"Left recursion supporting is ambiguous with repeatable parser"
+                                          f"({self}) that which couldn't fail.")
                             return FAIL_
                         return sub_res.value
 
@@ -414,7 +415,9 @@ def as_fixed(self, lang):
                         continue
                     return Result.mismatched
 
-            return constexpr[Result.find_lr](stacked_func_)
+            ret = constexpr[Result.find_lr](stacked_func_)
+            label_return.mark()
+            return ret
 
     self.match = seq_match
 

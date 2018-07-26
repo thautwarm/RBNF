@@ -131,8 +131,8 @@ def as_fixed(self, lang):
         match: const = parser_.match
         result = match(tokenizers, state)
 
-        if result.status is FindLR:
-            stacked_func: LRFunc = result.value
+        if result.status is constexpr[FindLR]:
+            stacked_func = result.value
 
             def stacked_func_(ast: AST):
                 stacked_result = stacked_func(ast)
@@ -150,11 +150,13 @@ def as_fixed(self, lang):
             ctx = state.ctx = state.ctx.copy()
             try:
                 ctx[name].append(result.value)
-            except KeyError:
+            except constexpr[KeyError]:
                 ctx[name] = [result.value]
+
         return result
 
     self.match = push_match
+
     return self
 
 
@@ -233,14 +235,15 @@ def _named_match(self: Atom, tokenizers: Sequence[Tokenizer], state: State):
 
 @Atom.as_fixed.case(Atom.Named)
 def as_fixed(self, lang):
-    _, name = self
-    parser_, when_, with__, rewrite_ = lang[name]
+    _, name_ = self
+    parser_, when_, with__, rewrite_ = lang[name_]
     parser_.as_fixed(lang)
 
     @feature(staging)
     def name_match(tokenizers, state):
         when: const = when_
         with_: const = with__
+        name: const = name_
         rewrite: const = rewrite_
         mismatched: const = Result.mismatched
         match: const = parser_.match
@@ -317,7 +320,7 @@ def as_fixed(self, lang):
                     with state.leave_with_context_recovery():
                         state.ctx = original_ctx.copy()
                         res = stacked_func(head)
-                        if res.status is Unmatched:
+                        if res.status is constexpr[Unmatched]:
                             break
 
                         # assert res.status is Matched

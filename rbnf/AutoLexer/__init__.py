@@ -93,6 +93,7 @@ def lexing(text: str, lexer_table: StrLexerTable, cast_map: CastMap = None):
             pat = case(text, pos)
             if not pat:
                 continue
+
             if pat in cast_map:
                 yield Tokenizer(cast_map[pat], cast_const(pat), lineno, colno)
             else:

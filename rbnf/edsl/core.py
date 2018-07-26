@@ -4,7 +4,7 @@ from rbnf.core.ParserC import Tokenizer, State, Literal, ConstStrPool
 from rbnf.err import LanguageBuiltError
 from rbnf.AutoLexer import lexing
 from rbnf._py_tools.unparse import Unparser
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 from Redy.Opt import Macro, feature, constexpr, const
 from Redy.Opt import get_ast
 from Redy.Magic.Classic import cast
@@ -64,6 +64,43 @@ def unparse(ast: ast.AST):
 
 def auto_context(fn):
     return _AutoContext(fn)
+
+
+class OrderedDefaultDict(OrderedDict):
+    cons: typing.Callable
+
+    def set_factory(self, cons):
+        self.cons = cons
+
+    def __missing__(self, key):
+        value = self[key] = self.cons()
+        return value
+
+
+class CamlMap(typing.Mapping):
+
+    def __init__(self):
+        self._ = []
+
+    def __getitem__(self, item):
+        for k, v in reversed(self._):
+            if k == item:
+                return v
+        raise KeyError(item)
+
+    def __setitem__(self, key, value):
+        self._.append((key, value))
+
+    def __len__(self):
+        return len(self._)
+
+    def __iter__(self):
+        for k, _ in self._:
+            yield k
+
+    def items(self):
+        for each in self._:
+            yield each
 
 
 def process(fn, bound_names):
@@ -177,8 +214,8 @@ LexerFactor = typing.Union[RegexLexerFactor, ConstantLexerFactor]
 class Language:
     def __init__(self, name):
         self.lang_name = name
-        self.named_parsers = OrderedDict()
-        self.dump_spec = OrderedDict()
+        self.named_parsers = CamlMap()
+        self.dump_spec = CamlMap()
         self.implementation = {}
         self.lexer = None
         self.ignore_lst = {}
@@ -203,8 +240,9 @@ class Language:
 
     def as_fixed(self):
         lang = self.implementation
+        impl = tuple(lang.values())
         lang['.has_compiled'] = self.has_compiled
-        for each, *_ in lang.values():
+        for each, *_ in impl:
             each.as_fixed(lang)
 
     @cast(reformat)
