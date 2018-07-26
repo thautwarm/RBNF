@@ -5,11 +5,9 @@ from rbnf.err import LanguageBuiltError
 from rbnf.AutoLexer import lexing
 from rbnf._py_tools.unparse import Unparser
 from collections import OrderedDict
-
 from Redy.Opt import Macro, feature, constexpr, const
 from Redy.Opt import get_ast
-
-exec("from linq import Flow as seq")
+from Redy.Magic.Classic import cast
 from typing import Sequence
 import abc
 import ast
@@ -18,7 +16,23 @@ import types
 import textwrap
 import builtins
 import io
+import warnings
 
+try:
+    from yapf.yapflib.yapf_api import FormatCode  # reformat a string of code
+
+
+    def reformat(text):
+        return FormatCode(text)[0]
+
+except ModuleNotFoundError:
+    warnings.warn("Install yapf to reformat generated code for readability!", UserWarning)
+
+
+    def reformat(ret):
+        return ret
+
+exec("from linq import Flow as seq")
 _internal_macro = Macro()
 staging = (const, constexpr)
 
@@ -80,9 +94,6 @@ def process(fn, bound_names):
 
         filename = fn.filename
         name = fn.fn_name
-        __defaults__ = None
-        __closure__ = None
-        __globals__ = fn.namespace
 
         code_object = compile(module_ast, filename, "exec")
 
@@ -168,20 +179,19 @@ class Language:
         self.lang_name = name
         self.named_parsers = OrderedDict()
         self.dump_spec = OrderedDict()
-
         self.implementation = {}
         self.lexer = None
         self.ignore_lst = {}
         self.prefix = {}
-
-        self.lazy_def: typing.List[typing.Union[Lexer, Parser]] = []
-
+        self.lazy_def = []
         # in rewrite/when/with clause, the global scope is exactly `Language.namespace`.
         self.namespace = {**builtins.__dict__, __name__: '__main__'}
-
         self._lexer_factors = []
         self._is_built = False
         self._backend_imported = []
+
+        # for deep optimization
+        self.has_compiled = set()
 
     def _kind(self, name):
         named_parser = self.named_parsers[name]
@@ -189,7 +199,15 @@ class Language:
             return "ruiko.Parser"
         elif isinstance(named_parser, ParserC.Literal):
             return "ruiko.Lexer"
+        raise TypeError
 
+    def as_fixed(self):
+        lang = self.implementation
+        lang['.has_compiled'] = self.has_compiled
+        for each, *_ in lang.values():
+            each.as_fixed(lang)
+
+    @cast(reformat)
     def dumps(self):
         static_method_prefix = '@staticmethod' + '\n'
         line_join = '\n'.join
@@ -209,7 +227,9 @@ class Language:
 
     def __call__(self, cls):
         cls.lang = self
+
         self.lazy_def.append(cls)
+
         if issubclass(cls, Parser):
             ret = ParserC.Atom.Named(cls.__name__)
 
@@ -219,6 +239,7 @@ class Language:
             prefix = cls.prefix()
             if prefix:
                 self.prefix[prefix] = cls.__name__
+
         else:
             raise TypeError
 
@@ -242,20 +263,20 @@ class Language:
         if self._is_built:
             raise LanguageBuiltError(f"Language {self.lang_name} is already built!")
 
-        def _process(fn, binding_names):
+        def _process(fn, _binding_names):
             if hasattr(fn, '__isabstractmethod__') and fn.__isabstractmethod__:
                 return None, None
             if isinstance(fn, classmethod):
                 # noinspection PyTypeChecker
-                fn_, ast = _process(fn.__func__, binding_names)
-                return classmethod(fn_), ast
+                fn_, ast_ = _process(fn.__func__, _binding_names)
+                return classmethod(fn_), ast_
 
             if isinstance(fn, types.MethodType):
                 # noinspection PyTypeChecker
-                fn_, ast = _process(fn.__func__, binding_names)
-                return types.MethodType(fn_, fn.__self__), ast
+                fn_, ast_ = _process(fn.__func__, _binding_names)
+                return types.MethodType(fn_, fn.__self__), ast_
 
-            return process(fn, binding_names)
+            return process(fn, _binding_names)
 
         def _get_ast(fn):
             if hasattr(fn, '__isabstractmethod__') and fn.__isabstractmethod__:
@@ -268,8 +289,8 @@ class Language:
                 return _get_ast(fn.__func__)
             return get_ast(fn.__code__)
 
-        lexer_factors = self._lexer_factors
         cast_map = {}
+        lexer_factors = self._lexer_factors
         dump_spec = self.dump_spec
         prefix_map = self.prefix
         lang = self.implementation
@@ -290,8 +311,10 @@ class Language:
         def parser_spec_maker():
             if when_ast:
                 yield unparse(when_ast)
+
             if fail_if_ast:
                 yield unparse(fail_if_ast)
+
             if rewrite_ast:
                 yield unparse(rewrite_ast)
 
@@ -319,9 +342,13 @@ class Language:
                     prefix_map[prefix] = ConstStrPool.cast_to_const(cls.__name__)
 
                 dump_spec[cls.__name__] = list(lexer_spec_maker())
+
             else:  # Parser
+
                 implementation: ParserC.Parser = cls.bnf()
+
                 lexer_factors.extend(get_lexer_factors(implementation))
+
                 binding_names = tuple(get_binding_names(implementation))
 
                 when, when_ast = _process(cls.when, ())
@@ -329,15 +356,13 @@ class Language:
                 rewrite, rewrite_ast = _process(cls.rewrite, binding_names)
 
                 lang[cls.__name__] = implementation, when, fail_if, rewrite
-                # @formatter:off
                 dump_spec[cls.__name__] = [f"def bnf():\n  return {dumps(implementation)}", *parser_spec_maker()]
-                # @formatter:on
 
-        def f1(e: LexerFactor):
+        def name_and_ty(e: LexerFactor):
             return e.name, type(e)
 
-        def f2(e: typing.Tuple[typing.Tuple[str, type], typing.List[LexerFactor]]):
-            (name, ty), members = e
+        def merge(e: typing.Tuple[typing.Tuple[str, type], typing.List[LexerFactor]]):
+            (lexer_group_name, lexer_ty), members = e
 
             def stream():
                 for each in members:
@@ -345,21 +370,22 @@ class Language:
 
             factors = set(stream())
 
-            if ty is ConstantLexerFactor:
+            if lexer_ty is ConstantLexerFactor:
                 # avoid to cover sub-patterns.
                 factors = sorted(factors, reverse=True)
+
             else:
                 factors = tuple(factors)
-            return ty(name, factors)
+
+            return lexer_ty(lexer_group_name, factors)
 
         # @formatter:off
         # noinspection PyProtectedMember
-        lexer_table = (seq(
-                        lexer_factors).chunk_by(f1)
-                                      .map(f2)
-                                      .map(lambda it: it.to_lexer())
-                                      .to_list()
-                                      ._)
+        lexer_table = (seq(lexer_factors)
+                       .chunk_by(name_and_ty)
+                       .map(merge)
+                       .map(lambda it: it.to_lexer())
+                       .to_list()._)
         # @formatter:on
 
         @feature(staging)
@@ -371,10 +397,7 @@ class Language:
             ignore_lst: const = self.ignore_lst
             cm: const = cast_map
             result = constexpr[lexing](text, constexpr[lexer_table], cm if constexpr[cm] else None)
-            if constexpr[ignore_lst]:
-                return filter(constexpr[filter_token], result)
-            else:
-                return result
+            return filter(constexpr[filter_token], result) if constexpr[ignore_lst] else result
 
         self.lexer = lexer
         self._is_built = True

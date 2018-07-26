@@ -1,6 +1,6 @@
 import std.common.[Number Space]
-pyimport functools.[reduce]
-pyimport asdl.[*]
+[python] import functools.[reduce]
+[python] import asdl.[*]
 ignore [Space]
 
 Numeric ::= ['-' as neg] Number as integral ['.' Number as floating]

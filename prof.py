@@ -27,7 +27,7 @@ text = """
 
 re_exp = re.compile(
     r'(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9]\.[^\s]{2,})')
-print(timeit.timeit("interactive.match(text)", globals=globals(), number=10))
-print(timeit.timeit("compiled(text)", globals=globals(), number=10))
-print(timeit.timeit("re_exp.match(text)", globals=globals(), number=10))  # I'm sorry to be so slow...
-# print(compiled(text))
+print(timeit.timeit("interactive.match(text)", globals=globals(), number=100))
+print(timeit.timeit("compiled(text)", globals=globals(), number=100))
+print(timeit.timeit("re_exp.match(text)", globals=globals(),
+                    number=100))  # I'm sorry to be so slow...  # print(compiled(text))

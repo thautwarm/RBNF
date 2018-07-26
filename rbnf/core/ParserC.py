@@ -4,10 +4,13 @@ from .Tokenizer import Tokenizer
 from .AST import *
 from .Result import *
 from .State import *
-from rbnf._literal_matcher import *
+from .._literal_matcher import *
 from Redy.Magic.Pattern import Pattern
+from Redy.Opt import feature, constexpr, const
 from warnings import warn
 import abc
+
+staging = (const, constexpr)
 
 Context = dict
 LRFunc = Callable[[AST], Result]
@@ -81,6 +84,9 @@ class Parser(abc.ABC):
             return Composed.And([self, *other[1]])
         return Composed.And([self, other])
 
+    def as_fixed(self, lang):
+        return
+
 
 @data
 class Literal(Parser, ConsInd, traits.Dense, traits.Im):
@@ -126,148 +132,17 @@ class Atom(Parser, ConsInd, traits.Dense, traits.Im):
     Any: '_'
 
     @Pattern
+    def as_fixed(self, lang):
+        addr = id(self)
+        has_compile = lang['.has_compiled']
+        if addr in has_compile:
+            return None
+        has_compile.add(addr)
+        return self[0]
+
+    @Pattern
     def match(self, tokenizers: Sequence[Tokenizer], state: State) -> Result:
         return self[0] if self.__structure__ else self
-
-
-@Atom.match.case(Atom.Any)
-def _any_match(_, tokenizers: Sequence[Tokenizer], state: State) -> Result:
-    try:
-        token = tokenizers[state.end_index]
-    except IndexError:
-        return Result.mismatched
-    state.new_one()
-    return Result.match(token)
-
-
-@Atom.match.case(Atom.Bind)
-def _bind_match(self: Atom, tokenizers: Sequence[Tokenizer], state: State):
-    _, name, parser = self
-    result = parser.match(tokenizers, state)
-
-    if result.status is FindLR:
-        stacked_func: LRFunc = result.value
-
-        def stacked_func_(ast: AST):
-            stacked_result = stacked_func(ast)
-            if stacked_result.status is Matched:
-                state.ctx = state.ctx.copy()
-                state.ctx[name] = stacked_result.value
-            return stacked_result
-
-        return Result.find_lr(stacked_func_)
-
-    elif result.status is Matched:
-        ctx = state.ctx = state.ctx.copy()
-        ctx[name] = result.value
-
-    return result
-
-
-@Atom.match.case(Atom.Push)
-def _push_match(self: Atom, tokenizers: Sequence[Tokenizer], state: State):
-    _, name, parser = self
-    result = parser.match(tokenizers, state)
-
-    if result.status is FindLR:
-        stacked_func: LRFunc = result.value
-
-        def stacked_func_(ast: AST):
-            stacked_result = stacked_func(ast)
-            if stacked_result.status is Matched:
-                state.ctx = state.ctx.copy()
-                try:
-                    state.ctx[name].append(stacked_result.value)
-                except KeyError:
-                    state.ctx[name] = [stacked_result.value]
-            return stacked_result
-
-        return Result.find_lr(stacked_func_)
-
-    elif result.status is Matched:
-        ctx = state.ctx = state.ctx.copy()
-        try:
-            ctx[name].append(result.value)
-        except KeyError:
-            ctx[name] = [result.value]
-    return result
-
-
-@Atom.match.case(Atom.Named)
-def _named_match(self: Atom, tokenizers: Sequence[Tokenizer], state: State):
-    _, name = self
-    lang = state.lang
-    parser, when, with_, rewrite = lang[name]
-    if when and not when(tokenizers, state):
-        return Result.mismatched
-
-    if name in state:
-        if state.lr_name:
-            return Result.mismatched
-
-        state.lr_name = name
-
-        def stacked_func(ast: AST):
-            return Result(Matched, ast)
-
-        return Result.find_lr(stacked_func)
-
-    with state.leave_with_context_recovery():
-        state.append(name)
-        state.ctx = {}
-
-        result: Result = parser.match(tokenizers, state)
-        if result.status is Matched:
-            if with_ and not with_(tokenizers, state):
-                return Result.mismatched
-            try:
-                return Result(Matched, rewrite(state) if rewrite else Named(name, result.value))
-            except NameError:
-                import dis
-                dis.dis(rewrite)
-                raise NameError
-        elif result.status is FindLR:
-            stacked_func: LRFunc = result.value
-
-            if state.lr_name is not name:
-                def stacked_func_(ast: AST):
-                    stacked_result = stacked_func(ast)
-                    if stacked_result.status is Matched:
-                        return Result.match(rewrite(state) if rewrite else Named(name, stacked_result.value))
-                    return stacked_result
-
-                return Result.find_lr(stacked_func_)
-        else:
-            return Result.mismatched
-
-        # find lr and state.lr_name is name
-
-        with state.left_recursion():
-            original_ctx = state.ctx.copy()
-
-            result: Result = parser.match(tokenizers, state)
-            if result.status is Unmatched:
-                return result
-
-            # assert result.status is not FindLR
-
-            if with_ and not with_(tokenizers, state):
-                return Result.mismatched
-
-            head: Named = rewrite(state) if rewrite else Named(name, result.value)
-            # stack jumping
-            while True:
-                with state.leave_with_context_recovery():
-                    state.ctx = original_ctx.copy()
-                    res = stacked_func(head)
-                    if res.status is Unmatched:
-                        break
-
-                    # assert res.status is Matched
-                    head = rewrite(state) if rewrite else Named(name, res.value)
-
-            result.value = head
-            return result
 
 
 @data
@@ -281,184 +156,14 @@ class Composed(Parser, ConsInd, traits.Dense, traits.Im):
     AnyNot: lambda which: f'not {which}'
 
     @Pattern
-    def match(self, tokenizers: Sequence[Tokenizer], state: State) -> Result:
+    def as_fixed(self, lang):
+        addr = id(self)
+        has_compile = lang['.has_compiled']
+        if addr in has_compile:
+            return None
+        has_compile.add(addr)
         return self[0]
 
-
-@Composed.match.case(Composed.AnyNot)
-def _not_match(self: Composed, tokenizers: Sequence[Tokenizer], state: State) -> Result:
-    which = self[1]
-    history = state.commit()
-    if which.match(tokenizers, state).status is Unmatched:
-        state.reset(history)
-        try:
-            token = tokenizers[state.end_index]
-        except IndexError:
-            return Result.mismatched
-        state.new_one()
-        return Result.match(token)
-    state.reset(history)
-    return Result.mismatched
-
-
-@Composed.match.case(Composed.And)
-def _and_match(self: Composed, tokenizers: Sequence[Tokenizer], state: State) -> Result:
-    atoms: List[Atom] = self[1]
-    history = state.commit()
-    nested = Nested()
-    nested_extend = nested.extend
-    nested_append = nested.append
-    # no tco here, so I have to repeat myself.
-    for i in range(len(atoms)):
-        atom = atoms[i]
-        each_result = atom.match(tokenizers, state)
-        if each_result.status is Unmatched:
-            state.reset(history)
-            return Result.mismatched
-        elif each_result.status is Matched:
-            each_value = each_result.value
-            if each_value.__class__ is Nested:
-                nested_extend(each_value)
-            else:
-                nested_append(each_value)
-            continue
-        else:
-            stacked_func: LRFunc = each_result.value
-
-            def stacked_func_(ast: AST):
-                stacked_result: Result = stacked_func(ast)
-                if stacked_result.status is Matched:
-                    stacked_value = stacked_result.value
-                    stacked_nested = nested.copy()
-                    _append = stacked_nested.append
-                    _extend = stacked_nested.extend
-
-                    if stacked_value.__class__ is Nested:
-                        _extend(stacked_value)
-                    else:
-                        _append(stacked_value)
-
-                    for j in range(i + 1, len(atoms)):
-                        atom_ = atoms[j]
-                        each_result_ = atom_.match(tokenizers, state)
-
-                        if each_result_.status is Matched:
-                            each_value_ = each_result_.value
-                            if each_value_.__class__ is Nested:
-                                _extend(each_value_)
-                            else:
-                                _append(each_value_)
-                            continue
-                        return Result.mismatched
-
-                    return Result.match(stacked_nested)
-                return stacked_result
-
-            return Result.find_lr(stacked_func_)
-
-    return Result(Matched, nested)
-
-
-@Composed.match.case(Composed.Or)
-def _or_match(self: Composed, tokenizers: Sequence[Tokenizer], state: State) -> Result:
-    ors: Sequence[Composed] = self[1]
-    history = state.commit()
-    for or_ in ors:
-        result = or_.match(tokenizers, state)
-        if result.status is not Unmatched:
-            return result
-
-        state.reset(history)
-        continue
-    return Result.mismatched
-
-
-@Composed.match.case(Composed.Seq)
-def _seq_match(self: Composed, tokenizers: Sequence[Tokenizer], state: State) -> Result:
-    FINISH = 0
-    CONTINUE = 1
-    FAIL = 2
-
-    _, parser, least, most = self
-    root_history = state.commit()
-    nested = Nested()
-
-    def foreach(times: int, _extend_fn, _append_fn):
-        if times == most:
-            return FINISH
-        history = state.commit()
-        sub_res: Result = parser.match(tokenizers, state)
-        if sub_res.status is Unmatched:
-            state.reset(history)
-            if times >= least:
-                return FINISH
-            return FAIL
-        elif sub_res.status is FindLR:
-            if least is 0:
-                state.reset(history)
-                warn(f"Left recursion supporting is ambiguous with repeatable parser({self}) that which couldn't fail.")
-                return FAIL
-            return sub_res.value
-
-        sub_value = sub_res.value
-        if sub_value.__class__ is Nested:
-            _extend_fn(sub_value)
-        else:
-            _append_fn(sub_value)
-        return CONTINUE
-
-    now = 0
-    while True:
-        status = foreach(now, nested.extend, nested.append)
-        if status is CONTINUE:
-            now += 1
-            continue
-        elif status is FINISH:
-            return Result(Matched, nested)
-
-        elif status is FAIL:
-            if now:
-                state.reset(root_history)
-            return Result.mismatched
-
-        stacked_func = status
-
-        def stacked_func_(ast: AST):
-            now_ = now
-            parsed_ = nested.copy()
-            res: Result = stacked_func(ast)
-
-            if res.status is Unmatched:
-                return Result.mismatched if now_ < least else Result.match(parsed_)
-
-            now_ += 1
-            while True:
-                status_ = foreach(now_, parsed_.extend, parsed_.append)
-                if status_ is FINISH:
-                    return Result.match(parsed_)
-                elif status_ is CONTINUE:
-                    now_ += 1
-                    continue
-                return Result.mismatched
-
-        return Result.find_lr(stacked_func_)
-
-
-@Composed.match.case(Composed.Jump)
-def _jump_match(self: Composed, tokenizers: Sequence[Tokenizer], state: State) -> Result:
-    parser_dict: Dict[str, Parser] = self[1]
-
-    try:
-        token = tokenizers[state.end_index]
-    except IndexError:
-        return Result.mismatched
-
-    parser = parser_dict.get(token.value)
-    if not parser:
-        return Result.mismatched
-    history = state.commit()
-    state.new_one()
-    result = parser.match(tokenizers, state)
-    if result.status is Status.Unmatched:
-        state.reset(history)
-    return result
+    @Pattern
+    def match(self, tokenizers: Sequence[Tokenizer], state: State) -> Result:
+        return self[0]

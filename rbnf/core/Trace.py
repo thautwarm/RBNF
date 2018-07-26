@@ -1,5 +1,5 @@
 from typing import Sequence, List, Generic, TypeVar
-from rbnf.Color import *
+from ..Color import *
 
 T = TypeVar('T')
 
@@ -60,7 +60,7 @@ class Trace(Sequence[T], Generic[T]):
 
     def __str__(self):
         content = ', '.join(
-                Green(str(each)) if i < self._virtual_len else Red(str(each)) for i, each in enumerate(self._records))
+            Green(str(each)) if i < self._virtual_len else Red(str(each)) for i, each in enumerate(self._records))
         return f'[{content}]'
 
     def __repr__(self):

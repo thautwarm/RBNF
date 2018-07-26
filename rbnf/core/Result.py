@@ -1,6 +1,6 @@
 from Redy.ADT.Core import data
 from Redy.Typing import *
-from rbnf.Color import *
+from ..Color import *
 
 __all__ = ['Status', 'Result', 'Matched', 'Unmatched', 'FindLR']
 
