@@ -1,16 +1,22 @@
 import operator
+import os
 from functools import reduce
+from rbnf.Color import Red, Green
 
 from rbnf.core.Optimize import optimize
-from rbnf.core.ParserC import Literal, Atom as _Atom, State, Tokenizer
+from rbnf.core.ParserC import Literal, Atom as _Atom, State
+from rbnf.core.Tokenizer import Tokenizer
 from rbnf.core import ParserC
 from rbnf.edsl import *
 from rbnf.AutoLexer import rbnf_lexer
 from rbnf.std.common import recover_codes, Name, Str, Number
+from Redy.Tools.PathLib import Path
 from typing import Sequence
 import typing
 import builtins
-from linq import Flow as seq
+
+seq: object
+exec("from linq import Flow as seq")
 
 C = Literal.C
 N = Literal.N
@@ -21,6 +27,28 @@ END = N('END')
 
 class ASDL:
     pass
+
+
+PatternName = str
+
+
+class _Wild:
+
+    def __contains__(self, item):
+        return True
+
+    def copy(self):
+        return self
+
+    def remove(self, item):
+        pass
+
+
+class MetaState(State):
+
+    def __init__(self, lang_implementation, requires: typing.Union[_Wild, typing.Set[PatternName]], filename=None):
+        super(MetaState, self).__init__(lang_implementation, filename)
+        self.requires = requires
 
 
 rbnf = Language("RBNF")
@@ -43,7 +71,7 @@ class CodeItem(Parser):
 
 
 class RewriteCode(FnCodeStr):
-    fn_args = "state"
+    fn_args = "state",
     fn_name = "rewrite"
 
 
@@ -245,16 +273,60 @@ class Import(Parser):
                     +  C('.') + C('[') + (C('*') | Name.unlimited @ "import_items") + C(']'))
         # @formatter:on
 
+    @staticmethod
+    @auto_context
+    def rewrite(state: MetaState):
+        language: Tokenizer
+        head: Tokenizer
+        tail: typing.List[Tokenizer]
+        import_items: typing.List[Tokenizer]
 
-"""
-    # def rewrite(state: State):
-    #     language: Tokenizer
-    #     head: Tokenizer
-    #     tail: typing.List[Tokenizer]
-    #     import_items: typing.List[Tokenizer]
-    #     raise NotImplemented
+        path_secs = [head.value, *(each.value for each in tail or ())]
+        if not import_items:
+            requires = _Wild()
+        else:
+            requires = {each.value for each in import_items}
 
-"""
+        if language:
+            language = language.value
+            if language != "python":
+                # TODO: c/c++, .net, java
+                raise NotImplementedError(language)
+
+            lang: Language = state.data
+            from_item = ".".join(path_secs)
+            import_items = "*" if isinstance(requires, _Wild) else "({})".format(', '.join(import_items))
+            exec(f"from {from_item} import {import_items}", lang.namespace)
+
+        else:
+            # TODO: this implementation is wrong but implementing the correct one requires the sperate asts and parsers.
+            # See `rbnf.std.compiler`, this one is correct though it's deprecated.
+
+            possible_paths = [Path('./', *path_secs)]
+            lang = state.data
+
+            ruiko_home = os.environ.get('RBNF_HOME')
+
+            if ruiko_home:
+                possible_paths.append(Path(ruiko_home, *path_secs))
+
+            for path in possible_paths:
+                filename = str(path)
+                if not filename[:-5].lower().endswith('.rbnf'):
+                    filename = filename + '.rbnf'
+                    path = Path(filename)
+                if not path.exists():
+                    continue
+
+                with path.open('r') as file:
+                    state = MetaState(rbnf.implementation, requires=requires, filename=str(path))
+                    state.data = lang
+                    _build_language(file.read(), state=state, filename=path)
+                if not requires:
+                    break
+
+            if requires and not isinstance(requires, _Wild):
+                raise ImportError(requires)
 
 
 @rbnf
@@ -288,13 +360,18 @@ class UParser(Parser):
 
     @classmethod
     @auto_context
-    def rewrite(cls, state: State):
+    def rewrite(cls, state: MetaState):
         name: Tokenizer
         impl: ParserC.Parser
         when: When.Data
         fail_if: With.Data
         rewrite: With.Data
         lang: Language = state.data
+
+        requires = state.requires
+        name = name.value
+        if name not in requires:
+            return
 
         methods = {}
         if when:
@@ -305,7 +382,8 @@ class UParser(Parser):
             methods['rewrite'] = rewrite[0]
 
         methods['bnf'] = lambda: impl
-        lang(type(name.value, (Parser,), methods))
+        lang(type(name, (Parser,), methods))
+        state.requires.remove(name)
 
 
 @rbnf
@@ -323,13 +401,18 @@ class ULexer(Parser):
 
     @classmethod
     @auto_context
-    def rewrite(cls, state: State):
+    def rewrite(cls, state: MetaState):
         name: Tokenizer
         cast: typing.Optional
         new_prefix: Tokenizer
         lexer_factors: typing.List[Tokenizer]
         lang: Language = state.data
         new_prefix = new_prefix
+
+        requires = state.requires
+        name = name.value
+        if name not in requires:
+            return
 
         def split_regex_and_constants(tk: Tokenizer):
             v = tk.value
@@ -351,7 +434,8 @@ class ULexer(Parser):
             new_prefix = new_prefix.value
             methods['prefix'] = lambda: new_prefix
 
-        lang(type(name.value, (Lexer,), methods))
+        lang(type(name, (Lexer,), methods))
+        state.requires.remove(name)
 
 
 @rbnf
@@ -370,9 +454,30 @@ class Grammar(Parser):
         return optimize(END.unlimited + (Statement + END.unlimited).unlimited)
 
     @classmethod
-    def rewrite(cls, state: State):
+    def rewrite(cls, state: MetaState):
         return state.data
 
 
 rbnf.build()
 rbnf.lexer = rbnf_lexer.rbnf_lexing
+
+
+def _build_language(text, state=None, filename=None):
+    tokens = tuple(rbnf.lexer(text))
+    Grammar.match(tokens, state)
+
+    if not tokens or state.end_index < len(tokens):
+        max_fetched = state.max_fetched
+        tk: Tokenizer = tokens[max_fetched]
+        before = recover_codes(tokens[max_fetched - 10:max_fetched])
+        later = recover_codes(tokens[max_fetched: max_fetched + 10])
+        raise SyntaxError(
+            "Error at line {}, col {}, see details:\n{}".format(tk.lineno, tk.colno, Green(before) + Red(later)))
+
+
+def build_language(text, lang: Language, filename=None):
+    state = MetaState(rbnf.implementation, requires=_Wild(), filename=filename)
+    state.data = lang
+    _build_language(text, state, filename)
+
+    lang.build()

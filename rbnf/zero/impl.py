@@ -1,51 +1,37 @@
-from rbnf.std.compiler import *
-from Redy.Opt.ConstExpr import constexpr, const
-
-try:
-    from Redy.Opt.ConstExpr import feature
-except:
-    from Redy.Opt.ConstExpr import optimize as feature
+from Redy.Opt import constexpr, const, feature
+from rbnf.std.common import *
+from rbnf.core.Tokenizer import Tokenizer
+from rbnf.core.Result import Result
+from rbnf.Color import Red, Green
 from .user_interface import ResultDescription
 
 __all__ = ['compile', 'ResultDescription']
 
 
 class ZeroExp:
-    def __init__(self, bnf_syntax: str, use: str, custom_lexer_wrapper=None):
-        state = State(bootstrap)
-        tokens = tuple(rbnf_lexing(bnf_syntax))
-        result = Statements.match(tokens, state)
-        if result.status is Unmatched or state.end_index < len(tokens):
-            max_fetched = state.max_fetched
-            tk: Tokenizer = tokens[max_fetched]
-            before = recover_codes(tokens[max_fetched - 10:max_fetched])
-            later = recover_codes(tokens[max_fetched: max_fetched + 10])
-            raise SyntaxError(
-                "Error at line {}, col {}, see details:\n{}".format(tk.lineno, tk.colno, Green(before) + Red(later)))
+    def __init__(self, bnf_syntax: str, use: str, custom_lexer_wrapper=None, language_name=None):
+        from rbnf.core.State import State
+        from rbnf.bootstrap.rbnf import Language, build_language
 
-        asdl = result.value
-        ctx = create_ctx()
-        visit(asdl, ctx)
+        ulang = Language(language_name or "ulang")
+        build_language(bnf_syntax, ulang)
 
-        lexer, lang, namespace = map(ctx.__getitem__, ['lex', 'lang', 'namespace'])
+        lexer, impl, namespace = ulang.lexer, ulang.implementation, ulang.namespace
 
         if use is None:
-            for end in asdl.value[::-1]:
-                if isinstance(end, ParserASDL):
-                    top_parser = namespace[end.name]
-                    break
-            else:
-                raise ValueError("No top parser found!")
+            try:
+                top_parser = tuple(ulang.named_parsers.values())[-1]
+            except:
+                raise ValueError("No parser defined!")
 
         else:
-            top_parser = namespace[use]
+            top_parser = ulang.named_parsers[use]
 
-        @feature
+        @feature(const, constexpr)
         def match(text) -> ResultDescription:
-            _state = State(constexpr[lang])
+            _state = constexpr[State](constexpr[impl])
             _wrapper: const = custom_lexer_wrapper
             _lexer: const = lexer
-
             _tokens = tuple(_wrapper(_lexer(text)) if constexpr[custom_lexer_wrapper] else _lexer(text))
             _result: Result = constexpr[top_parser.match](_tokens, _state)
             return constexpr[ResultDescription](_state, _result.value, _tokens)
@@ -53,6 +39,6 @@ class ZeroExp:
         self.match = match
 
 
-def compile(bnf_syntax: str, use: str = None, custom_lexer_wrapper=None):
+def compile(bnf_syntax: str, use: str = None, custom_lexer_wrapper=None, language_name=None):
     bnf_syntax = bnf_syntax
-    return ZeroExp(bnf_syntax, use, custom_lexer_wrapper=custom_lexer_wrapper)
+    return ZeroExp(bnf_syntax, use, custom_lexer_wrapper=custom_lexer_wrapper, language_name=language_name)

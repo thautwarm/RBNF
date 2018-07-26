@@ -1,4 +1,4 @@
-from ..ParserC import State, Tokenizer
+from rbnf.core.ParserC import State, Tokenizer
 from typing import Generic, TypeVar, Sequence
 
 T = TypeVar('T')

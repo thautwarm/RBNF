@@ -68,12 +68,15 @@ def process(fn, bound_names):
         code = "def {0}({1}):\n{2}".format(fn.fn_name, ", ".join(fn.fn_args),
                                            textwrap.indent(f'{assign_code_str}\n{fn.code}', " " * 4))
         module_ast = ast.parse(code, fn.filename)
-        module_ast = ast.increment_lineno(module_ast, fn.lineno)
+        bound_name_line_inc = int(bool(bound_names)) + len(bound_names) + 1
+        module_ast = ast.increment_lineno(module_ast, fn.lineno - bound_name_line_inc)
         filename = fn.filename
         name = fn.fn_name
         __defaults__ = None
         __closure__ = None
         __globals__ = fn.namespace
+
+
 
     else:
         code = fn.__code__
@@ -90,6 +93,7 @@ def process(fn, bound_names):
         __globals__ = fn.__globals__
 
     code_object = compile(module_ast, filename, "exec")
+
     code_object = next(
         each for each in code_object.co_consts if isinstance(each, types.CodeType) and each.co_name == name)
     # noinspection PyArgumentList,PyUnboundLocalVariable
@@ -162,7 +166,8 @@ class Language:
         self.lazy_def_parsers: typing.List[Parser] = []
 
         # in rewrite/when/with clause, the global scope is exactly `Language.namespace`.
-        self.namespace = {**builtins.__dict__}
+        self.namespace = {**builtins.__dict__, __name__: '__main__'}
+
 
         self._lexer_factors = []
         self._is_built = False
@@ -308,7 +313,7 @@ class Language:
         for cls in self.lazy_def_parsers:
             implementation: ParserC.Parser = cls.bnf()
             lexer_factors.extend(get_lexer_factors(implementation))
-            binding_names = get_binding_names(implementation)
+            binding_names = tuple(get_binding_names(implementation))
 
             when, when_ast = _process(cls.when, ())
             fail_if, fail_if_ast = _process(cls.fail_if, binding_names)

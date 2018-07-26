@@ -220,9 +220,12 @@ def _named_match(self: Atom, tokenizers: Sequence[Tokenizer], state: State):
         if result.status is Matched:
             if with_ and not with_(tokenizers, state):
                 return Result.mismatched
-
-            return Result(Matched, rewrite(state) if rewrite else Named(name, result.value))
-
+            try:
+                return Result(Matched, rewrite(state) if rewrite else Named(name, result.value))
+            except NameError:
+                import dis
+                dis.dis(rewrite)
+                raise NameError
         elif result.status is FindLR:
             stacked_func: LRFunc = result.value
 
