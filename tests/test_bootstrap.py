@@ -1,6 +1,6 @@
 import typing
 
-from rbnf.State import State
+from rbnf.Core.State import State
 from rbnf.edsl import Parser, Lexer, Language, auto_context
 
 lang = Language("number take")

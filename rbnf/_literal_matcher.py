@@ -1,5 +1,5 @@
-from .Tokenizer import Tokenizer
-from .CachingPool import ConstStrPool
+from .core.Tokenizer import Tokenizer
+from rbnf.core.CachingPool import ConstStrPool
 import re
 
 

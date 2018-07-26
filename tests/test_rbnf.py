@@ -11,12 +11,14 @@ Z ::= Alpha+ Num as n1 Num as n2
             d2 = int(n2.value)
             return d1 > d2
 """)
-from rbnf.State import State
+from rbnf.core.State import State
 from rbnf.bootstrap.rbnf import Grammar, rbnf, Language
 
 state = State(rbnf.implementation)
 state.data = Language("mylang")
+
 state.filename = __file__
+
 tokens = tuple(rbnf.lexer(codes))
 Grammar.match(tokens, state)
 ULexer = rbnf.implementation['ULexer'][0]
@@ -25,8 +27,13 @@ mylang = state.data
 #
 mylang.build()
 #
+
+from rbnf.core.State import State
 tokens = list(mylang.lexer("a b c 10 8"))
 
 state = State(mylang.implementation)
 print(mylang.implementation['Z'])
 print(mylang.named_parsers['Z'].match(tokens, state))
+print(mylang.lang_name)
+with open('test_compiled_rbnf.py', 'w') as f:
+    f.write(mylang.dumps())

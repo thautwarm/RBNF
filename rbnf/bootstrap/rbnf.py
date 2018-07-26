@@ -1,11 +1,11 @@
 import operator
 from functools import reduce
 
-from rbnf.AutoLexer import rbnf_lexer
-from rbnf.Optimize import optimize
+from rbnf.core.Optimize import optimize
+from rbnf.core.ParserC import Literal, Atom as _Atom, State, Tokenizer
+from rbnf.core import ParserC
 from rbnf.edsl import *
-from rbnf.ParserC import Literal, Atom as _Atom, State, Tokenizer, ConstStrPool
-from rbnf import ParserC
+from rbnf.AutoLexer import rbnf_lexer
 from rbnf.std.common import recover_codes, Name, Str, Number
 from typing import Sequence
 import typing
@@ -269,7 +269,7 @@ class Ignore(Parser):
     def rewrite(cls, state: State):
         names: typing.List[Tokenizer]
         lang: Language = state.data
-        lang.ignore_lst.extend(id(ConstStrPool.cast_to_const(each.value)) for each in names)
+        lang.ignore(*(each.value for each in names))
 
 
 @rbnf
@@ -329,6 +329,7 @@ class ULexer(Parser):
         new_prefix: Tokenizer
         lexer_factors: typing.List[Tokenizer]
         lang: Language = state.data
+        new_prefix = new_prefix
 
         def split_regex_and_constants(tk: Tokenizer):
             v = tk.value
@@ -347,6 +348,7 @@ class ULexer(Parser):
         if cast:
             methods['cast'] = lambda: True
         if new_prefix:
+            new_prefix = new_prefix.value
             methods['prefix'] = lambda: new_prefix
 
         lang(type(name.value, (Lexer,), methods))
@@ -366,11 +368,6 @@ class Grammar(Parser):
     @classmethod
     def bnf(cls):
         return optimize(END.unlimited + (Statement + END.unlimited).unlimited)
-
-    @classmethod
-    def when(cls, tokens, state):
-        state.data = Language(state.filename[:-5])
-        return True
 
     @classmethod
     def rewrite(cls, state: State):

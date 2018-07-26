@@ -1,8 +1,10 @@
-from rbnf.ParserC import *
+from rbnf.core.ParserC import *
+from rbnf.core.CachingPool import ConstStrPool
 from rbnf.AutoLexer import str_lexer, regex_lexer
 import typing
+from Redy.Magic.Pattern import Pattern as _Pat
 
-__all__ = ['get_binding_names', 'get_lexer_factors', 'RegexLexerFactor', 'ConstantLexerFactor']
+__all__ = ['get_binding_names', 'get_lexer_factors', 'RegexLexerFactor', 'ConstantLexerFactor', 'dumps']
 
 
 class RegexLexerFactor(typing.NamedTuple):
@@ -85,3 +87,65 @@ def get_binding_names(parser: 'Parser') -> typing.Generator[str, None, None]:
     return {
         Literal: for_literal, Atom: for_atom, Composed: for_composed
     }[type(parser)](parser)
+
+
+@_Pat
+def dumps(parser):
+    return type(parser)
+
+_NAME = 0
+_VALUE = 1
+@dumps.case(Literal)
+def dumps(self):
+    tag = self[0]
+    if tag is Literal.R:
+        return f"ruiko.R({self[1].raw[_VALUE]!r})"
+    if tag is Literal.V:
+        return f"ruiko.V({self[1].raw[_VALUE]!r})"
+    if tag is Literal.N:
+        return f"ruiko.N({self[1].raw[_NAME]!r})"
+    if tag is Literal.C:
+        return f"ruiko.C({self[1].raw[_VALUE]!r})"
+    if tag is Literal.NC:
+        name, value = self[1].raw
+        return f"ruiko.NC({name!r}, {value!r})"
+    if tag is Literal.Invert:
+        return f"~{dumps(self[1])!r}"
+    raise TypeError(tag)
+
+
+@dumps.case(Atom)
+def dumps(self):
+    tag = self[0]
+    if tag is Atom.Bind:
+        _, name, or_parser = self
+        return f"ruiko.Bind({name!r}, {dumps(or_parser)})"
+    if tag is Atom.Push:
+        _, name, or_parser = self
+        return f"ruiko.Bind({name!r}, {dumps(or_parser)})"
+    if tag is Atom.Named:
+        _, name = self
+        return f"ruiko.Named({name!r})"
+    if tag is Atom.Any:
+        return f"ruiko.Any"
+    raise TypeError(tag)
+
+
+@dumps.case(Composed)
+def dumps(self):
+    tag = self[0]
+    if tag is Composed.And:
+        atoms = self[1]
+        return "ruiko.And([{}])".format(",".join(map(dumps, atoms)))
+    if tag is Composed.Or:
+        ands = self[1]
+        return "ruiko.Or([{}])".format(",".join(map(dumps, ands)))
+    if tag is Composed.Seq:
+        _, parser, least, most = self
+        return "ruiko.Seq({}, {!r}, {!r})".format(dumps(parser), least, most)
+    if tag is Composed.Jump:
+        dictionary = ", ".join("{!r}: {}".format(k, dumps(v)) for k, v in self[1].items())
+        return "ruiko.Jump({})".format(dictionary)
+    if tag is self.AnyNot:
+        return "ruiko.AnyNot({!r})".format(dumps(self[1]))
+    raise TypeError(tag)

@@ -1,10 +1,10 @@
 from Redy.ADT import traits
 from Redy.ADT.Core import RDT, data
-
+from .Tokenizer import Tokenizer
 from .AST import *
 from .Result import *
 from .State import *
-from ._literal_matcher import *
+from rbnf._literal_matcher import *
 from Redy.Magic.Pattern import Pattern
 from warnings import warn
 import abc
@@ -23,6 +23,9 @@ class ConsInd(traits.Ind):  # index following constructing
 
 
 class Parser(abc.ABC):
+
+    def dumps(self):
+        return self.dumps()
 
     def match(self, tokenizers: Sequence[Tokenizer], state: State) -> Result:
         return self.match(tokenizers, state)
@@ -53,6 +56,12 @@ class Parser(abc.ABC):
 
     def __matmul__(self, other: str):
         return Atom.Bind(other, self)
+
+    def __repr__(self):
+        return self.__sig_str__
+
+    def __str__(self):
+        return repr(self)
 
     def __or__(self, other):
         if self[0] is Composed.Or:
@@ -94,9 +103,6 @@ class Literal(Parser, ConsInd, traits.Dense, traits.Im):
 
     Invert: RDT[lambda literal: [[make_invert(literal)], f'~{literal}']]
 
-    def __repr__(self):
-        return self.__sig_str__
-
     def match(self, tokenizers: Sequence[Tokenizer], state: State) -> Result:
         try:
             token = tokenizers[state.end_index]
@@ -118,9 +124,6 @@ class Atom(Parser, ConsInd, traits.Dense, traits.Im):
     Push: lambda name, or_parser: f'({or_parser}) to {name}'
     Named: RDT[lambda ref_name: [[ConstStrPool.cast_to_const(ref_name)], ref_name]]
     Any: '_'
-
-    def __repr__(self):
-        return self.__sig_str__
 
     @Pattern
     def match(self, tokenizers: Sequence[Tokenizer], state: State) -> Result:
@@ -273,23 +276,6 @@ class Composed(Parser, ConsInd, traits.Dense, traits.Im):
         ', '.join(f"({case.__repr__()} => {parser})" for case, parser in switch_cases.items()))
 
     AnyNot: lambda which: f'not {which}'
-
-    def __repr__(self):
-        return self.__sig_str__
-
-    def get_names(self):
-        if self[0] is Composed.Jump:
-            for each in map(Parser.get_names, self[1].values()):
-                yield from each
-        elif self[0] is Composed.Seq:
-            yield from self[1].get_names()
-
-        else:
-            for each in map(Parser.get_names, self[1]):
-                yield from each
-
-    def __str__(self):
-        return self.__sig_str__
 
     @Pattern
     def match(self, tokenizers: Sequence[Tokenizer], state: State) -> Result:

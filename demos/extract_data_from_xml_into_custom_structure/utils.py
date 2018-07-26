@@ -1,5 +1,4 @@
 from rbnf.Tokenizer import Tokenizer
-from rbnf.AST import AST
 from typing import Sequence
 
 

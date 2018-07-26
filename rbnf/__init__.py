@@ -1,4 +1,4 @@
-from .ParserC import *
+from .core.ParserC import *
 from .__release_info__ import *
 from Redy.Tools.PathLib import Path
 import os

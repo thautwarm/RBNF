@@ -1,5 +1,7 @@
-from rbnf.ParserC import *
-from rbnf import ParserC
+import types
+
+from rbnf.core.ParserC import *
+from rbnf.core import ParserC
 import abc
 import typing
 
@@ -76,54 +78,66 @@ class _ParserLike(abc.ABC):
 
 class Parser(_ParserLike):
 
-    @classmethod
-    def bnf(cls):
+    @staticmethod
+    def bnf():
         raise NotImplemented
 
-    @classmethod
-    def rewrite(cls, state: State):
+    @staticmethod
+    def rewrite(state: State):
         raise NotImplemented
 
-    @classmethod
-    def when(cls, tokens: Sequence[Tokenizer], state: State):
+    @staticmethod
+    def when(tokens: Sequence[Tokenizer], state: State):
         raise NotImplemented
 
-    @classmethod
-    def fail_if(cls, tokens: Sequence[Tokenizer], state: State):
+    @staticmethod
+    def fail_if(tokens: Sequence[Tokenizer], state: State):
         raise NotImplemented
 
 
 class Lexer(_ParserLike):
 
-    @classmethod
-    def regex(cls) -> typing.Sequence[str]:
+    @staticmethod
+    def regex() -> typing.Sequence[str]:
         return []
 
-    @classmethod
-    def constants(cls) -> typing.Sequence[str]:
+    @staticmethod
+    def constants() -> typing.Sequence[str]:
         return []
 
-    @classmethod
-    def cast(cls) -> bool:
+    @staticmethod
+    def cast() -> bool:
         return False
 
-    @classmethod
-    def prefix(cls) -> typing.Optional[str]:
+    @staticmethod
+    def prefix() -> typing.Optional[str]:
         return None
+
+
+_nullable_fn = typing.Union[types.FunctionType]
 
 
 class Language:
     lexer: Callable[[str], Sequence[Tokenizer]]
     named_parsers: typing.Dict[str, typing.Union[Atom.Named, Literal.N]]
-    implementation: typing.Dict[str, ParserC.Parser]
+    implementation: typing.Dict[str, typing.Tuple[ParserC.Parser, _nullable_fn, _nullable_fn, _nullable_fn]]
+
     prefix: typing.Dict[str, str]
 
     lang_name: str
     namespace = {}
-    ignore_lst = []
+    ignore_lst = {}
 
     def __init__(self, lang_name: str): ...
 
     def __call__(self, *args, **kwargs) -> ParserC.Parser: ...
 
     def build(self): ...
+
+    def dumps(self) -> str: ...
+
+    def ignore(self, *ignore_lst: str):
+        """
+        ignore a set of tokens with specific names
+        """
+        ...

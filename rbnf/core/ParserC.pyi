@@ -1,16 +1,10 @@
 from typing import *
-
 import typing
-from Redy.ADT import traits
-from Redy.ADT.Core import RDT, data
-
+from .Tokenizer import Tokenizer
 from .AST import *
 from .Result import *
 from .State import *
-
-from ._literal_matcher import *
-from Redy.Magic.Pattern import Pattern
-from warnings import warn
+from .._literal_matcher import *
 
 Context = dict
 LRFunc = Callable[[AST], Result]

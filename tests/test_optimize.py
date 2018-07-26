@@ -1,7 +1,5 @@
-from rbnf.ParserC import Literal, Context, Tokenizer, State, Atom as PAtom, get_binding_names, get_lexer_factors
-from rbnf.AutoLexer.rbnf_lexer import *
-from rbnf.CachingPool import ConstStrPool
-from rbnf.Optimize import optimize
+from rbnf.ParserC import Literal, get_lexer_factors
+from rbnf.Core.Optimize import optimize
 
 AB = Literal.V("a") + Literal.V("b")
 AC = Literal.V("a") + Literal.V("c")

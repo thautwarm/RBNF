@@ -1,9 +1,8 @@
 import itertools
-import types
 
 from .rbnf_parser import *
 from ..AutoLexer import lexing
-from ..ParserC import *
+from ..core.ParserC import *
 from Redy.Magic.Pattern import Pattern
 
 try:
@@ -12,12 +11,11 @@ except:
     from Redy.Opt.ConstExpr import optimize as feature
 from Redy.Opt.ConstExpr import constexpr, const
 from Redy.Collections.Traversal import chunk_by
-from Redy.Magic.Classic import cast
 from Redy.Tools.PathLib import Path
-from ..Optimize import optimize
+from rbnf.core.Optimize import optimize
 from .rbnf_parser import Statements, bootstrap, rbnf_lexing, IfNotNone
 from .common import *
-import os, ast
+import os
 
 C = Literal.C
 N = Literal.N
