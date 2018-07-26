@@ -63,6 +63,7 @@ def process(fn, bound_names):
     if not bound_names:
         return fn, get_ast(fn.__code__)
 
+    # noinspection PyArgumentList,PyArgumentList
     if isinstance(fn, FnCodeStr):
         assign_code_str = "ctx = state.ctx\n" + "\n".join("{0} = ctx.get({0!r})".format(name) for name in bound_names)
         code = "def {0}({1}):\n{2}".format(fn.fn_name, ", ".join(fn.fn_args),
@@ -76,7 +77,11 @@ def process(fn, bound_names):
         __closure__ = None
         __globals__ = fn.namespace
 
+        code_object = compile(module_ast, filename, "exec")
 
+        local = {}
+        exec(code_object, fn.namespace, local)
+        ret = local[name]
 
     else:
         code = fn.__code__
@@ -92,12 +97,12 @@ def process(fn, bound_names):
         __closure__ = fn.__closure__
         __globals__ = fn.__globals__
 
-    code_object = compile(module_ast, filename, "exec")
+        code_object = compile(module_ast, filename, "exec")
 
-    code_object = next(
-        each for each in code_object.co_consts if isinstance(each, types.CodeType) and each.co_name == name)
-    # noinspection PyArgumentList,PyUnboundLocalVariable
-    ret = types.FunctionType(code_object, __globals__, name, __defaults__, __closure__)
+        code_object = next(
+            each for each in code_object.co_consts if isinstance(each, types.CodeType) and each.co_name == name)
+        # noinspection PyArgumentList,PyUnboundLocalVariable
+        ret = types.FunctionType(code_object, __globals__, name, __defaults__, __closure__)
     return ret, module_ast
 
 
@@ -167,7 +172,6 @@ class Language:
 
         # in rewrite/when/with clause, the global scope is exactly `Language.namespace`.
         self.namespace = {**builtins.__dict__, __name__: '__main__'}
-
 
         self._lexer_factors = []
         self._is_built = False

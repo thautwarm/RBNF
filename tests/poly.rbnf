@@ -15,8 +15,6 @@ Add ::= ('-' as neg | '+') Term as term
             return -coef if neg else coef, power
 Poly ::=  ['-' as neg] Term as head Add* as seq
         rewrite
-            import builtins
-            print(builtins.__dict__.keys())
             class Polynomial(dict):
                 def __missing__(self, k):
                     return 0
