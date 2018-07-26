@@ -181,7 +181,7 @@ class Trail(Parser):
                        | C('{') + Number(1, 2) @ "interval" + C('}')
                        ).optional
                  ) + ( C('as') + Name @ "bind"
-                     | C("as") + C('[') @ "is_seq" + Name@"bind" + C("]")
+                     | C("to") + C('[') @ "is_seq" + Name@"bind" + C("]")
                      ).optional)
         # @formatter:on
 
@@ -217,11 +217,9 @@ class Trail(Parser):
         if bind:
             name: str = bind.value
             if is_seq:
-                ctx['name'].append(ret)
                 # noinspection PyTypeChecker
                 ret = ret >> name
             else:
-                ctx['name'] = ret
                 ret = ret @ name
 
         return optimize(ret)
@@ -295,8 +293,10 @@ class Import(Parser):
 
             lang: Language = state.data
             from_item = ".".join(path_secs)
-            import_items = "*" if isinstance(requires, _Wild) else "({})".format(', '.join(import_items))
-            exec(f"from {from_item} import {import_items}", lang.namespace)
+            import_items = "*" if isinstance(requires, _Wild) else "({})".format(', '.join(requires))
+            import_stmt = f"from {from_item} import {import_items}"
+            lang._backend_imported.append(import_stmt)
+            exec(import_stmt, lang.namespace)
 
         else:
             # TODO: this implementation is wrong but implementing the correct one requires the sperate asts and parsers.
@@ -475,7 +475,7 @@ def _build_language(text, state=None, filename=None):
             "Error at line {}, col {}, see details:\n{}".format(tk.lineno, tk.colno, Green(before) + Red(later)))
 
 
-def build_language(text, lang: Language, filename=None):
+def build_language(text, lang: Language, filename):
     state = MetaState(rbnf.implementation, requires=_Wild(), filename=filename)
     state.data = lang
     _build_language(text, state, filename)

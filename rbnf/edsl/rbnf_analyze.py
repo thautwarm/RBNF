@@ -52,7 +52,8 @@ def get_lexer_factors(parser: 'Parser') -> typing.Generator[
                 yield from each
         elif comp[0] is Composed.Seq:
             yield from get_lexer_factors(comp[1])
-
+        elif comp[0] is Composed.AnyNot:
+            yield from get_lexer_factors(comp[1])
         else:
             for each in map(get_lexer_factors, comp[1]):
                 yield from each
@@ -80,6 +81,9 @@ def get_binding_names(parser: 'Parser') -> typing.Generator[str, None, None]:
         elif comp[0] is Composed.Seq:
             yield from get_binding_names(comp[1])
 
+        elif comp[0] is Composed.AnyNot:
+            yield from get_binding_names(comp[1])
+
         else:
             for each in map(get_binding_names, comp[1]):
                 yield from each
@@ -93,8 +97,11 @@ def get_binding_names(parser: 'Parser') -> typing.Generator[str, None, None]:
 def dumps(parser):
     return type(parser)
 
+
 _NAME = 0
 _VALUE = 1
+
+
 @dumps.case(Literal)
 def dumps(self):
     tag = self[0]
@@ -122,7 +129,7 @@ def dumps(self):
         return f"ruiko.Bind({name!r}, {dumps(or_parser)})"
     if tag is Atom.Push:
         _, name, or_parser = self
-        return f"ruiko.Bind({name!r}, {dumps(or_parser)})"
+        return f"ruiko.Push({name!r}, {dumps(or_parser)})"
     if tag is Atom.Named:
         _, name = self
         return f"ruiko.Named({name!r})"
@@ -134,18 +141,23 @@ def dumps(self):
 @dumps.case(Composed)
 def dumps(self):
     tag = self[0]
+
     if tag is Composed.And:
         atoms = self[1]
         return "ruiko.And([{}])".format(",".join(map(dumps, atoms)))
+
     if tag is Composed.Or:
         ands = self[1]
         return "ruiko.Or([{}])".format(",".join(map(dumps, ands)))
+
     if tag is Composed.Seq:
         _, parser, least, most = self
         return "ruiko.Seq({}, {!r}, {!r})".format(dumps(parser), least, most)
+
     if tag is Composed.Jump:
         dictionary = ", ".join("{!r}: {}".format(k, dumps(v)) for k, v in self[1].items())
         return "ruiko.Jump({})".format(dictionary)
-    if tag is self.AnyNot:
-        return "ruiko.AnyNot({!r})".format(dumps(self[1]))
+
+    if tag is Composed.AnyNot:
+        return "ruiko.AnyNot({})".format(dumps(self[1]))
     raise TypeError(tag)

@@ -1,20 +1,20 @@
 from Redy.Opt import constexpr, const, feature
-from rbnf.std.common import *
-from rbnf.core.Tokenizer import Tokenizer
 from rbnf.core.Result import Result
-from rbnf.Color import Red, Green
 from .user_interface import ResultDescription
+import typing
+import io
+from Redy.Tools.PathLib import Path
 
 __all__ = ['compile', 'ResultDescription']
 
 
 class ZeroExp:
-    def __init__(self, bnf_syntax: str, use: str, custom_lexer_wrapper=None, language_name=None):
+    def __init__(self, bnf_syntax: str, use: str, custom_lexer_wrapper=None, language_name=None, filename="<zero>"):
         from rbnf.core.State import State
         from rbnf.bootstrap.rbnf import Language, build_language
 
-        ulang = Language(language_name or "ulang")
-        build_language(bnf_syntax, ulang)
+        self._ulang = ulang = Language(language_name or "ulang")
+        build_language(bnf_syntax, ulang, filename)
 
         lexer, impl, namespace = ulang.lexer, ulang.implementation, ulang.namespace
 
@@ -26,6 +26,7 @@ class ZeroExp:
 
         else:
             top_parser = ulang.named_parsers[use]
+
         @feature(const, constexpr)
         def match(text) -> ResultDescription:
             _state = constexpr[State](constexpr[impl])
@@ -37,7 +38,18 @@ class ZeroExp:
 
         self.match = match
 
+    def dumps(self):
+        return self._ulang.dumps()
 
-def compile(bnf_syntax: str, use: str = None, custom_lexer_wrapper=None, language_name=None):
+    def dump(self, file_repr: typing.Union[str, io.BufferedWriter]):
+        if isinstance(file_repr, str):
+            file_repr = Path(file_repr).open('w')
+
+        with file_repr:
+            file_repr.write(self.dumps())
+
+
+def compile(bnf_syntax: str, use: str = None, custom_lexer_wrapper=None, language_name=None, filename="zero"):
     bnf_syntax = bnf_syntax
-    return ZeroExp(bnf_syntax, use, custom_lexer_wrapper=custom_lexer_wrapper, language_name=language_name)
+    return ZeroExp(bnf_syntax, use, custom_lexer_wrapper=custom_lexer_wrapper, language_name=language_name,
+                   filename=filename)

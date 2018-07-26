@@ -1,30 +1,8 @@
-import rbnf.zero as ze
-import timeit
+import re, timeit
 
-ze_exp = ze.compile("""
-pyimport rbnf.std.common.[recover_codes Tokenizer]
+from prof_interactive import ze_exp as interactive
+from prof_compiled import ze_exp as compiled
 
-import std.common.[Space]
-pattern ::= (~ ('/' | Space))+ as seq
-            rewrite 
-                seq
-url ::= ('https' | 'http') as prefix 
-        '://'              as slash 
-        pattern            as head 
-        ('/' pattern)*     as tail 
-        ['/'] 
-        rewrite
-            def stream():
-                yield prefix
-                yield slash
-                yield from head
-                yield from tail
-            stream()
-text ::= (url | ~url)+ as urls
-        rewrite
-            tuple(recover_codes(url) for url in urls if not isinstance(url, Tokenizer))
-lexer_helper := R'.'
-""", use='text')
 text = """
 <html lang="en">
   <head>
@@ -46,11 +24,10 @@ text = """
 # print(ze_exp.match(text).result)
 #
 
-import re
 
 re_exp = re.compile(
-        r'(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9]\.[^\s]{2,})')
-print(timeit.timeit("ze_exp.match(text)", globals=globals(), number=10))
-
-print(timeit.timeit("re_exp.match(text)", globals=globals(), number=10))
-# I'm sorry to be so slow...
+    r'(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9]\.[^\s]{2,})')
+print(timeit.timeit("interactive.match(text)", globals=globals(), number=10))
+print(timeit.timeit("compiled(text)", globals=globals(), number=10))
+print(timeit.timeit("re_exp.match(text)", globals=globals(), number=10))  # I'm sorry to be so slow...
+# print(compiled(text))
