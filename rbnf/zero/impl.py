@@ -26,7 +26,6 @@ class ZeroExp:
 
         else:
             top_parser = ulang.named_parsers[use]
-
         @feature(const, constexpr)
         def match(text) -> ResultDescription:
             _state = constexpr[State](constexpr[impl])

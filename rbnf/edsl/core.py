@@ -70,7 +70,13 @@ def process(fn, bound_names):
                                            textwrap.indent(f'{assign_code_str}\n{fn.code}', " " * 4))
         module_ast = ast.parse(code, fn.filename)
         bound_name_line_inc = int(bool(bound_names)) + len(bound_names) + 1
-        module_ast = ast.increment_lineno(module_ast, fn.lineno - bound_name_line_inc)
+        module_ast: ast.Module = ast.increment_lineno(module_ast, fn.lineno - bound_name_line_inc)
+        fn_ast = module_ast.body[0]
+        if isinstance(fn_ast.body[-1], ast.Expr):
+            # in rbnf you don't need to write return if the last statement in the end is an expression.
+            it: ast.Expr = fn_ast.body[-1]
+            fn_ast.body[-1] = ast.Return(lineno=it.lineno, col_offset=it.col_offset, value=it.value)
+
         filename = fn.filename
         name = fn.fn_name
         __defaults__ = None
