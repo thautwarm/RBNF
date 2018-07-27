@@ -493,7 +493,7 @@ def _find_nth(string: str, element, nth: int = 0):
     return pos
 
 
-def _build_language(text: str, state=None, filename=None):
+def _build_language(text: str, state=None, filename='Unknown'):
     tokens = tuple(rbnf.lexer(text))
     Grammar.match(tokens, state)
 
@@ -505,8 +505,8 @@ def _build_language(text: str, state=None, filename=None):
         before = text[max(0, pos - 25): pos]
         later = text[pos: min(pos + 25, len(text))]
 
-        raise SyntaxError(
-            "Error at line {}, col {}, see details:\n{}".format(tk.lineno, tk.colno, Green(before) + Red(later)))
+        raise SyntaxError("Error at line {}, col {} in file {}, see details:\n{}".format(tk.lineno, tk.colno, filename,
+                                                                                         Green(before) + Red(later)))
 
 
 def build_language(text, lang: Language, filename):
