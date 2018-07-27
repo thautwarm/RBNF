@@ -1,6 +1,7 @@
 """
 Current module is archived with PEP8 rules broken.
 """
+# @formatter:off
 from Redy.Opt import feature, const, constexpr
 staging = (const, constexpr)
 from . import *

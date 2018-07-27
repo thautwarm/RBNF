@@ -13,7 +13,7 @@ class ZeroExp:
         from rbnf.core.State import State
         from rbnf.bootstrap.rbnf import Language, build_language
 
-        self._ulang = ulang = Language(language_name or "ulang")
+        self._lang = ulang = Language(language_name or "ulang")
         build_language(bnf_syntax, ulang, filename)
 
         lexer, impl, namespace = ulang.lexer, ulang.implementation, ulang.namespace
@@ -39,7 +39,7 @@ class ZeroExp:
         self.match = match
 
     def dumps(self):
-        return self._ulang.dumps()
+        return self._lang.dumps()
 
     def dump(self, file_repr: typing.Union[str, io.BufferedWriter]):
         if isinstance(file_repr, str):
@@ -50,6 +50,5 @@ class ZeroExp:
 
 
 def compile(bnf_syntax: str, use: str = None, custom_lexer_wrapper=None, language_name=None, filename="zero"):
-    bnf_syntax = bnf_syntax
     return ZeroExp(bnf_syntax, use, custom_lexer_wrapper=custom_lexer_wrapper, language_name=language_name,
                    filename=filename)

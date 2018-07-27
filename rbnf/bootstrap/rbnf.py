@@ -1,5 +1,6 @@
 import operator
 import os
+import warnings
 from functools import reduce
 from rbnf.Color import Red, Green
 
@@ -8,7 +9,7 @@ from rbnf.core.ParserC import Literal, Atom as _Atom, State
 from rbnf.core.Tokenizer import Tokenizer
 from rbnf.core import ParserC
 from rbnf.edsl import *
-from rbnf.AutoLexer import rbnf_lexer
+from rbnf.auto_lexer import rbnf_lexer
 from rbnf.std.common import recover_codes, Name, Str, Number
 from Redy.Tools.PathLib import Path
 from typing import Sequence
@@ -146,7 +147,10 @@ class Primitive(Parser):
         str: Tokenizer = get('str')
 
         if name:
-            return state.data.named_parsers[name.value]
+            name = name.value
+            if name == '_':
+                return ParserC.Atom.Any
+            return state.data.named_parsers[name]
         if or_:
             return or_
         if optional:
@@ -264,8 +268,10 @@ class Import(Parser):
     def bnf(cls):
         # @formatter:off
         return optimize(
-                    (C("[") + Name @ "language" + C("]")).optional
-                    + C("import")
+                    ((C("[") + Name @ "language" + C("]")).optional
+                     + C("import")
+                     | C("pyimport") @ "python"
+                    )
                     + Name @ "head"
                     + (C('.') + (C('*') | Name >> "tail")).unlimited
                     +  C('.') + C('[') + (C('*') | Name.unlimited @ "import_items") + C(']'))
@@ -278,18 +284,22 @@ class Import(Parser):
         head: Tokenizer
         tail: typing.List[Tokenizer]
         import_items: typing.List[Tokenizer]
-
+        python: Tokenizer
         path_secs = [head.value, *(each.value for each in tail or ())]
         if not import_items:
             requires = _Wild()
         else:
             requires = {each.value for each in import_items}
 
-        if language:
-            language = language.value
-            if language != "python":
-                # TODO: c/c++, .net, java
-                raise NotImplementedError(language)
+        if language or python:
+            if python:
+                warnings.warn("keyword `pyimport` is deprecated, "
+                              "use [python] import instead.", DeprecationWarning)
+            else:
+                language = language.value
+                if language != "python":
+                    # TODO: c/c++, .net, java
+                    raise NotImplementedError(language)
 
             lang: Language = state.data
             from_item = ".".join(path_secs)
@@ -462,15 +472,26 @@ rbnf.build()
 rbnf.lexer = rbnf_lexer.rbnf_lexing
 
 
-def _build_language(text, state=None, filename=None):
+def _find_nth(string: str, element, nth: int = 0):
+    pos: int = string.index(element)
+    while nth:
+        pos = string.index(element, pos) + 1
+        nth -= 1
+    return pos
+
+
+def _build_language(text: str, state=None, filename=None):
     tokens = tuple(rbnf.lexer(text))
     Grammar.match(tokens, state)
 
     if not tokens or state.end_index < len(tokens):
         max_fetched = state.max_fetched
         tk: Tokenizer = tokens[max_fetched]
-        before = recover_codes(tokens[max_fetched - 10:max_fetched])
-        later = recover_codes(tokens[max_fetched: max_fetched + 10])
+        lineno, colno = tk.lineno, tk.colno
+        pos = _find_nth(text, '\n', lineno) + colno - 1
+        before = text[max(0, pos - 25): pos]
+        later = text[pos: min(pos + 25, len(text))]
+
         raise SyntaxError(
             "Error at line {}, col {}, see details:\n{}".format(tk.lineno, tk.colno, Green(before) + Red(later)))
 

@@ -1,8 +1,9 @@
 from .rbnf_analyze import *
 from rbnf.core import ParserC
-from rbnf.core.ParserC import Tokenizer, State, Literal, ConstStrPool
+from rbnf.core.ParserC import State, Literal, ConstStrPool
+from rbnf.core.Tokenizer import Tokenizer
 from rbnf.err import LanguageBuiltError
-from rbnf.AutoLexer import lexing
+from rbnf.auto_lexer import lexing
 from rbnf._py_tools.unparse import Unparser
 from collections import OrderedDict, defaultdict
 from Redy.Opt import Macro, feature, constexpr, const
@@ -19,7 +20,7 @@ import io
 import warnings
 
 try:
-    from yapf.yapflib.yapf_api import FormatCode  # reformat a string of code
+    from yapf.yapflib.yapf_api import FormatCode
 
 
     def reformat(text):
@@ -32,7 +33,7 @@ except ModuleNotFoundError:
     def reformat(ret):
         return ret
 
-exec("from linq import Flow as seq")
+exec("from linq import Flow as seq")  # the inference of linq-t just stucks and make pycharm boom...
 _internal_macro = Macro()
 staging = (const, constexpr)
 
@@ -49,7 +50,7 @@ class FnCodeStr(typing.NamedTuple):
     filename: str
     namespace: dict
 
-    fn_name = None
+    fn_name = "fn"
     fn_args = "tokens", "state"
 
 

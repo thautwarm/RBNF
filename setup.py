@@ -1,6 +1,7 @@
 from setuptools import setup
 from Redy.Tools.Version import Version
 from Redy.Tools.PathLib import Path
+
 # with open('./README.rst', encoding='utf-8') as f:
 #     readme = f.read()
 readme = ''
@@ -12,6 +13,7 @@ with open(version_filename) as f:
 with Path("./rbnf/__release_info__.py").open('w') as f:
     f.write('__VERSION__ = {}\n__AUTHOR__ = "thautwarm"'.format(repr(str(version))))
 
+# @formatter:off
 setup(name='rbnf',
       version=str(version),
       keywords='parser-generator, context-sensitive, ebnf',
@@ -21,7 +23,15 @@ setup(name='rbnf',
       url='https://github.com/thautwarm/Ruiko',
       author='thautwarm',
       author_email='twshere@outlook.com',
-      packages=['rbnf', 'rbnf.std', 'rbnf.AutoLexer', 'rbnf.zero'],
+      packages=['rbnf',
+                'rbnf.core',
+                'rbnf.core.parser_algo',
+                'rbnf._py_tools',
+                'rbnf.bootstrap',
+                'rbnf.edsl',
+                'rbnf.auto_lexer',
+                'rbnf.std',
+                'rbnf.zero'],
       package_data={
       	'rbnf':[
             'rbnf_libs/std/*.rbnf',

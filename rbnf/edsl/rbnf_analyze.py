@@ -1,6 +1,6 @@
 from rbnf.core.ParserC import *
 from rbnf.core.CachingPool import ConstStrPool
-from rbnf.AutoLexer import str_lexer, regex_lexer
+from rbnf.auto_lexer import str_lexer, regex_lexer
 import typing
 from Redy.Magic.Pattern import Pattern as _Pat
 
@@ -12,7 +12,7 @@ class RegexLexerFactor(typing.NamedTuple):
     factors: typing.List[str]
 
     def to_lexer(self):
-        print("making regex lexers:", self.name, self.factors)
+        # print("making regex lexers:", self.name, self.factors)
         return ConstStrPool.cast_to_const(self.name), regex_lexer(self.factors)
 
 
@@ -21,7 +21,7 @@ class ConstantLexerFactor(typing.NamedTuple):
     factors: typing.List[str]
 
     def to_lexer(self):
-        print("making constant lexers: ", self.name, self.factors)
+        # print("making constant lexers: ", self.name, self.factors)
         return ConstStrPool.cast_to_const(self.name), str_lexer(self.factors)
 
 
@@ -117,7 +117,7 @@ def dumps(self):
         name, value = self[1].raw
         return f"ruiko.NC({name!r}, {value!r})"
     if tag is Literal.Invert:
-        return f"~{dumps(self[1])!r}"
+        return f"~{dumps(self[1].raw)}"
     raise TypeError(tag)
 
 

@@ -63,5 +63,5 @@ def make_invert(literal):
     def match(token: Tokenizer):
         return not fn(token)
 
-    match.raw = fn.raw
+    match.raw = literal
     return match
