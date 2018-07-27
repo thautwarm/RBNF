@@ -25,11 +25,6 @@ NC = Literal.NC
 
 END = N('END')
 
-
-class ASDL:
-    pass
-
-
 PatternName = str
 
 
@@ -146,29 +141,33 @@ class Primitive(Parser):
 
         str: Tokenizer = get('str')
 
-        if name:
-            name = name.value
-            if name == '_':
-                return ParserC.Atom.Any
-            return state.data.named_parsers[name]
-        if or_:
-            return or_
-        if optional:
-            return optional.optional
-        if str:
-            value: builtins.str = str.value
-            if value.startswith("'"):
-                return C(value[1:-1])
-            if value[1] is not "'":
-                raise TypeError("Prefix could be only sized 1.")
-            prefix, value = value[0], value[2:-1]
-            try:
-                prefix = cls.lang.prefix[prefix]
-            except KeyError:
-                raise NameError(f"Prefix `{prefix}` not found!")
+        def delay():
+            nonlocal name
+            if name:
+                name = name.value
+                if name == '_':
+                    return ParserC.Atom.Any
+                return state.data.named_parsers[name]
+            if or_:
+                return or_()
+            if optional:
+                return optional().optional
+            if str:
+                value: builtins.str = str.value
+                if value.startswith("'"):
+                    return C(value[1:-1])
+                if value[1] is not "'":
+                    raise TypeError("Prefix could be only sized 1.")
+                prefix, value = value[0], value[2:-1]
+                try:
+                    prefix = cls.lang.prefix[prefix]
+                except KeyError:
+                    raise NameError(f"Prefix `{prefix}` not found!")
 
-            return NC(cls.lang.prefix[prefix], value)
-        raise TypeError
+                return NC(cls.lang.prefix[prefix], value)
+            raise TypeError
+
+        return delay
 
 
 @rbnf
@@ -201,32 +200,38 @@ class Trail(Parser):
         is_seq: object
         ctx: dict
 
-        def ret():
-            if rev:
-                return ~atom
-            if one_or_more:
-                return atom.one_or_more
-            if zero_or_more:
-                return atom.unlimited
-            if interval:
-                if len(interval) is 1:
-                    least = int(interval[0].value)
-                    most = -1
+        def delay():
+            nonlocal atom
+            atom = atom()
+
+            def ret():
+                if rev:
+                    return ~atom
+                if one_or_more:
+                    return atom.one_or_more
+                if zero_or_more:
+                    return atom.unlimited
+                if interval:
+                    if len(interval) is 1:
+                        least = int(interval[0].value)
+                        most = -1
+                    else:
+                        least, most = map(lambda _: int(_.value), interval)
+                    return atom.repeat(least, most)
+                return atom
+
+            ret: Parser = ret()
+            if bind:
+                name: str = bind.value
+                if is_seq:
+                    # noinspection PyTypeChecker
+                    ret = ret >> name
                 else:
-                    least, most = map(lambda _: int(_.value), interval)
-                return atom.repeat(least, most)
-            return atom
+                    ret = ret @ name
 
-        ret: Parser = ret()
-        if bind:
-            name: str = bind.value
-            if is_seq:
-                # noinspection PyTypeChecker
-                ret = ret >> name
-            else:
-                ret = ret @ name
+            return optimize(ret)
 
-        return optimize(ret)
+        return delay
 
 
 @rbnf
@@ -240,7 +245,11 @@ class And(Parser):
     @auto_context
     def rewrite(cls, state: State):
         and_seq: ParserC.Nested
-        return optimize(reduce(operator.add, and_seq))
+
+        def delay():
+            return optimize(reduce(operator.add, [each() for each in and_seq]))
+
+        return delay
 
 
 @rbnf
@@ -255,10 +264,14 @@ class Or(Parser):
     def rewrite(cls, state: State):
         tail: ParserC.Nested
         head: ParserC.Parser
-        if not tail:
-            return head
 
-        return optimize(reduce(operator.or_, tail, head))
+        def delay():
+            if not tail:
+                return head()
+
+            return optimize(reduce(operator.or_, [each() for each in tail], head()))
+
+        return delay
 
 
 @rbnf
@@ -391,7 +404,7 @@ class UParser(Parser):
         if rewrite:
             methods['rewrite'] = rewrite[0]
 
-        methods['bnf'] = lambda: impl
+        methods['bnf'] = lambda: impl()
         lang(type(name, (Parser,), methods))
         state.requires.remove(name)
 
