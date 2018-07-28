@@ -9,6 +9,7 @@ from rbnf.core.ParserC import Literal, Atom as _Atom, State
 from rbnf.core.Tokenizer import Tokenizer
 from rbnf.core import ParserC
 from rbnf.edsl import *
+from rbnf.edsl.rbnf_analyze import check_parsing_complete
 from rbnf.auto_lexer import rbnf_lexer
 from rbnf.std.common import recover_codes, Name, Str, Number
 from Redy.Tools.PathLib import Path
@@ -344,7 +345,7 @@ class Import(Parser):
                 with path.open('r') as file:
                     state = MetaState(rbnf.implementation, requires=requires, filename=str(path))
                     state.data = lang
-                    _build_language(file.read(), state=state, filename=path)
+                    _build_language(file.read(), state=state)
                 if not requires:
                     break
 
@@ -493,25 +494,14 @@ def _find_nth(string: str, element, nth: int = 0):
     return pos
 
 
-def _build_language(text: str, state=None, filename='Unknown'):
+def _build_language(text: str, state):
     tokens = tuple(rbnf.lexer(text))
     Grammar.match(tokens, state)
-
-    if not tokens or state.end_index < len(tokens):
-        max_fetched = state.max_fetched
-        tk: Tokenizer = tokens[max_fetched]
-        lineno, colno = tk.lineno, tk.colno
-        pos = _find_nth(text, '\n', lineno) + colno - 1
-        before = text[max(0, pos - 25): pos]
-        later = text[pos: min(pos + 25, len(text))]
-
-        raise SyntaxError("Error at line {}, col {} in file {}, see details:\n{}".format(tk.lineno, tk.colno, filename,
-                                                                                         Green(before) + Red(later)))
+    check_parsing_complete(text, tokens, state)
 
 
 def build_language(text, lang: Language, filename):
     state = MetaState(rbnf.implementation, requires=_Wild(), filename=filename)
     state.data = lang
-    _build_language(text, state, filename)
-
+    _build_language(text, state)
     lang.build()

@@ -1,10 +1,13 @@
 from rbnf.core.ParserC import *
+from rbnf.core.Tokenizer import Tokenizer
 from rbnf.core.CachingPool import ConstStrPool
 from rbnf.auto_lexer import str_lexer, regex_lexer
+
 import typing
 from Redy.Magic.Pattern import Pattern as _Pat
 
-__all__ = ['get_binding_names', 'get_lexer_factors', 'RegexLexerFactor', 'ConstantLexerFactor', 'dumps']
+__all__ = ['get_binding_names', 'get_lexer_factors', 'RegexLexerFactor', 'ConstantLexerFactor', 'dumps',
+           'check_parsing_complete']
 
 
 class RegexLexerFactor(typing.NamedTuple):
@@ -161,3 +164,28 @@ def dumps(self):
     if tag is Composed.AnyNot:
         return "ruiko.AnyNot({})".format(dumps(self[1]))
     raise TypeError(tag)
+
+
+def check_parsing_complete(text, tokens: Sequence[Tokenizer], state: State):
+    def _find_nth(string: str, element, nth: int = 0):
+        _pos: int = string.index(element)
+        while nth:
+            _pos = string.index(element, _pos) + 1
+            nth -= 1
+        return _pos
+
+    if not tokens:
+        raise SyntaxError(
+            "Error at first character in file {}, see details:\n{}".format(state.filename, Red(text[:20])))
+
+    if state.end_index < len(tokens):
+        max_fetched = state.max_fetched
+        tk: Tokenizer = tokens[max_fetched]
+        lineno, colno = tk.lineno, tk.colno
+        pos = _find_nth(text, '\n', lineno) + colno - 1
+        before = text[max(0, pos - 25): pos]
+        later = text[pos: min(pos + 25, len(text))]
+
+        raise SyntaxError(
+            "Error at line {}, col {} in file {}, see details:\n{}".format(tk.lineno, tk.colno, state.filename,
+                                                                           Green(before) + Red(later)))

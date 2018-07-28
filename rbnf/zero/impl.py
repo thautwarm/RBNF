@@ -21,7 +21,7 @@ class ZeroExp:
         if use is None:
             try:
                 top_parser = tuple(ulang.named_parsers.values())[-1]
-            except:
+            except IndexError:
                 raise ValueError("No parser defined!")
 
         else:
@@ -50,5 +50,7 @@ class ZeroExp:
 
 
 def compile(bnf_syntax: str, use: str = None, custom_lexer_wrapper=None, language_name=None, filename="zero"):
-    return ZeroExp(bnf_syntax, use, custom_lexer_wrapper=custom_lexer_wrapper, language_name=language_name,
+    return ZeroExp(bnf_syntax, use,
+                   custom_lexer_wrapper=custom_lexer_wrapper,
+                   language_name=language_name,
                    filename=filename)
