@@ -35,8 +35,12 @@ setup(name='rbnf',
       package_data={
       	'rbnf':[
             'rbnf_libs/std/*.rbnf',
+            'edsl/*.pyi',
+            'core/*.pyi',
+            'zero/*.pyi',
             'rbnf_libs/*.rbnf'
-      		]},
+      		]
+      },
       install_requires=[
           'linq-t>=0.1',
           'Redy'

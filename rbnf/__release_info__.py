@@ -1,2 +1,2 @@
-__VERSION__ = '0.1.31'
+__VERSION__ = '0.1.34'
 __AUTHOR__ = "thautwarm"
