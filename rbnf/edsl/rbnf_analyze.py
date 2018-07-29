@@ -168,7 +168,10 @@ def dumps(self):
 
 def check_parsing_complete(text, tokens: Sequence[Tokenizer], state: State):
     def _find_nth(string: str, element, nth: int = 0):
-        _pos: int = string.index(element)
+        _pos: int = string.find(element)
+        if _pos is -1:
+            return 0
+        
         while nth:
             _pos = string.index(element, _pos) + 1
             nth -= 1
@@ -180,12 +183,16 @@ def check_parsing_complete(text, tokens: Sequence[Tokenizer], state: State):
 
     if state.end_index < len(tokens):
         max_fetched = state.max_fetched
-        tk: Tokenizer = tokens[max_fetched]
+        if max_fetched >= len(tokens):
+            tk = tokens[-1]
+            err_description = 'Incomplete syntax'
+        else:
+            tk: Tokenizer = tokens[max_fetched]
+            err_description = 'Error'
         lineno, colno = tk.lineno, tk.colno
-        pos = _find_nth(text, '\n', lineno) + colno - 1
+        pos = _find_nth(text, '\n', lineno) + colno
         before = text[max(0, pos - 25): pos]
         later = text[pos: min(pos + 25, len(text))]
 
-        raise SyntaxError(
-            "Error at line {}, col {} in file {}, see details:\n{}".format(tk.lineno, tk.colno, state.filename,
-                                                                           Green(before) + Red(later)))
+        raise SyntaxError("{} at line {}, col {} in file {}, see details:\n"
+                          "{}".format(err_description, tk.lineno, tk.colno, state.filename, Green(before) + Red(later)))
