@@ -11,46 +11,40 @@ with open(version_filename) as f:
     version = Version(f.read().strip())
 
 with Path("./rbnf/__release_info__.py").open('w') as f:
-    f.write('__VERSION__ = {}\n__AUTHOR__ = "thautwarm"'.format(repr(str(version))))
+    f.write('__VERSION__ = {}\n__AUTHOR__ = "thautwarm"'.format(
+        repr(str(version))))
 
-# @formatter:off
-setup(name='rbnf',
-      version=str(version),
-      keywords='parser-generator, context-sensitive, ebnf',
-      description="context sensitive grammar parser generator",
-      long_description=readme,
-      license='MIT',
-      url='https://github.com/thautwarm/Ruiko',
-      author='thautwarm',
-      author_email='twshere@outlook.com',
-      packages=['rbnf',
-                'rbnf.core',
-                'rbnf.core.parser_algo',
-                'rbnf._py_tools',
-                'rbnf.bootstrap',
-                'rbnf.edsl',
-                'rbnf.auto_lexer',
-                'rbnf.std',
-                'rbnf.zero'],
-      package_data={
-      	'rbnf':[
-            'rbnf_libs/std/*.rbnf',
-            'edsl/*.pyi',
-            'core/*.pyi',
-            'zero/*.pyi',
+setup(
+    name='rbnf',
+    version=str(version),
+    keywords='parser-generator, context-sensitive, ebnf',
+    description="context sensitive grammar parser generator for CPython",
+    long_description=readme,
+    license='MIT',
+    python_requires='>=3.6.0',
+    url='https://github.com/thautwarm/Ruiko',
+    author='thautwarm',
+    author_email='twshere@outlook.com',
+    packages=[
+        'rbnf', 'rbnf.core', 'rbnf.core.parser_algo', 'rbnf.py_tools',
+        'rbnf.bootstrap', 'rbnf.edsl', 'rbnf.auto_lexer', 'rbnf.std',
+        'rbnf.zero'
+    ],
+    entry_points={'console_scripts': ['rbnf=rbnf.cli:main']},
+    package_data={
+        'rbnf': [
+            'rbnf_libs/std/*.rbnf', 'edsl/*.pyi', 'core/*.pyi', 'zero/*.pyi',
             'rbnf_libs/*.rbnf'
-      		]
-      },
-      install_requires=[
-          'linq-t>=0.1',
-          'Redy'
-      ],
-      platforms='any',
-      classifiers=[
-          'Programming Language :: Python :: 3.6',
-          'Programming Language :: Python :: 3.7',
-          'Programming Language :: Python :: Implementation :: CPython'],
-      zip_safe=False)
+        ]
+    },
+    install_requires=['linq-t>=0.1', 'Redy>=0.2.2', 'rtpy>=0.2.8'],
+    platforms='any',
+    classifiers=[
+        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: Implementation :: CPython'
+    ],
+    zip_safe=False)
 
 version.increment(version_number_idx=2, increment=1)
 if version[2] is 42:

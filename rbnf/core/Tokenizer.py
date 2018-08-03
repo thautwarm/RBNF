@@ -12,6 +12,6 @@ class TokenMeta(type):
 @record
 class Tokenizer(AST, metaclass=TokenMeta):
     name: ConstString
-    value: ...  # maybe const string
+    value:...  # maybe const string
     lineno: int
     colno: int

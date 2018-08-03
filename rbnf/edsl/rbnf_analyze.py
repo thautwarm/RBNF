@@ -6,8 +6,10 @@ from rbnf.auto_lexer import str_lexer, regex_lexer
 import typing
 from Redy.Magic.Pattern import Pattern as _Pat
 
-__all__ = ['get_binding_names', 'get_lexer_factors', 'RegexLexerFactor', 'ConstantLexerFactor', 'dumps',
-           'check_parsing_complete']
+__all__ = [
+    'get_binding_names', 'get_lexer_factors', 'RegexLexerFactor',
+    'ConstantLexerFactor', 'dumps', 'check_parsing_complete'
+]
 
 
 class RegexLexerFactor(typing.NamedTuple):
@@ -28,8 +30,8 @@ class ConstantLexerFactor(typing.NamedTuple):
         return ConstStrPool.cast_to_const(self.name), str_lexer(self.factors)
 
 
-def get_lexer_factors(parser: 'Parser') -> typing.Generator[
-    typing.Union[RegexLexerFactor, ConstantLexerFactor], None, None]:
+def get_lexer_factors(parser: 'Parser') -> typing.Generator[typing.Union[
+        RegexLexerFactor, ConstantLexerFactor], None, None]:
     def for_literal(lit: Literal):
         if lit[0] is Literal.R:
             a, b = lit[1].raw
@@ -62,7 +64,9 @@ def get_lexer_factors(parser: 'Parser') -> typing.Generator[
                 yield from each
 
     return {
-        Literal: for_literal, Atom: for_atom, Composed: for_composed
+        Literal: for_literal,
+        Atom: for_atom,
+        Composed: for_composed
     }[type(parser)](parser)
 
 
@@ -72,10 +76,12 @@ def get_binding_names(parser: 'Parser') -> typing.Generator[str, None, None]:
 
     def for_atom(atom: Atom):
         if Atom.Bind is atom[0]:
-            return atom[1],
-        if Atom.Push is atom[0]:
-            return atom[1],
-        return ()
+            yield atom[1]
+            yield from get_binding_names(atom[2])
+
+        elif Atom.Push is atom[0]:
+            yield atom[1]
+            yield from get_binding_names(atom[2])
 
     def for_composed(comp: Composed):
         if comp[0] is Composed.Jump:
@@ -92,7 +98,9 @@ def get_binding_names(parser: 'Parser') -> typing.Generator[str, None, None]:
                 yield from each
 
     return {
-        Literal: for_literal, Atom: for_atom, Composed: for_composed
+        Literal: for_literal,
+        Atom: for_atom,
+        Composed: for_composed
     }[type(parser)](parser)
 
 
@@ -158,7 +166,8 @@ def dumps(self):
         return "ruiko.Seq({}, {!r}, {!r})".format(dumps(parser), least, most)
 
     if tag is Composed.Jump:
-        dictionary = ", ".join("{!r}: {}".format(k, dumps(v)) for k, v in self[1].items())
+        dictionary = ", ".join(
+            "{!r}: {}".format(k, dumps(v)) for k, v in self[1].items())
         return "ruiko.Jump({})".format(dictionary)
 
     if tag is Composed.AnyNot:
@@ -166,20 +175,22 @@ def dumps(self):
     raise TypeError(tag)
 
 
-def check_parsing_complete(text, tokens: Sequence[Tokenizer], state: State):
+def check_parsing_complete(source_code: str, tokens: Sequence[Tokenizer],
+                           state: State):
     def _find_nth(string: str, element, nth: int = 0):
         _pos: int = string.find(element)
         if _pos is -1:
             return 0
-        
+
         while nth:
             _pos = string.index(element, _pos) + 1
             nth -= 1
         return _pos
 
     if not tokens:
-        raise SyntaxError(
-            "Error at first character in file {}, see details:\n{}".format(state.filename, Red(text[:20])))
+        raise SyntaxError("Error occurred at the first character "
+                          "in file {}, see details:\n{}".format(
+                              state.filename, Red(source_code[:20])))
 
     if state.end_index < len(tokens):
         max_fetched = state.max_fetched
@@ -190,9 +201,11 @@ def check_parsing_complete(text, tokens: Sequence[Tokenizer], state: State):
             tk: Tokenizer = tokens[max_fetched]
             err_description = 'Error'
         lineno, colno = tk.lineno, tk.colno
-        pos = _find_nth(text, '\n', lineno) + colno
-        before = text[max(0, pos - 25): pos]
-        later = text[pos: min(pos + 25, len(text))]
+        pos = _find_nth(source_code, '\n', lineno) + colno
+        before = source_code[max(0, pos - 25):pos]
+        later = source_code[pos:min(pos + 25, len(source_code))]
 
         raise SyntaxError("{} at line {}, col {} in file {}, see details:\n"
-                          "{}".format(err_description, tk.lineno, tk.colno, state.filename, Green(before) + Red(later)))
+                          "{}".format(err_description, tk.lineno, tk.colno,
+                                      state.filename,
+                                      Green(before) + Red(later)))

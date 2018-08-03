@@ -2,11 +2,11 @@ from .rbnf_analyze import *
 from rbnf.core import ParserC
 from rbnf.core.ParserC import State, Literal, ConstStrPool
 from rbnf.core.Tokenizer import Tokenizer
-from rbnf.err import LanguageBuiltError
+from rbnf.err import LanguageBuildingError
 from rbnf.auto_lexer import lexing
-from rbnf._py_tools.unparse import Unparser
-from collections import OrderedDict, defaultdict
-from Redy.Opt import Macro, feature, constexpr, const
+from rbnf.py_tools.unparse import Unparser
+from collections import OrderedDict
+from Redy.Opt import feature, constexpr, const
 from Redy.Opt import get_ast
 from Redy.Magic.Classic import cast
 from typing import Sequence
@@ -22,20 +22,21 @@ import warnings
 try:
     from yapf.yapflib.yapf_api import FormatCode
 
-
-    def reformat(text):
+    def _reformat(text):
         return FormatCode(text)[0]
 
 except ModuleNotFoundError:
-    warnings.warn("Install yapf to reformat generated code for readability!", UserWarning)
-
+    warnings.warn("Install yapf to reformat generated code!", UserWarning, 2)
 
     def reformat(ret):
         return ret
 
-exec("from linq import Flow as seq")  # the inference of linq-t just stucks and make pycharm boom...
-_internal_macro = Macro()
+
+exec("from linq import Flow as seq")
 staging = (const, constexpr)
+__all__ = ['auto_context', 'Parser', 'Lexer', 'Language', '_FnCodeStr']
+
+# the inference of linq-t just got stuck and make pycharm boom...
 
 
 class _AutoContext:
@@ -43,7 +44,7 @@ class _AutoContext:
         self.fn = fn
 
 
-class FnCodeStr(typing.NamedTuple):
+class _FnCodeStr(typing.NamedTuple):
     code: str
     lineno: int
     colno: int
@@ -79,7 +80,6 @@ class OrderedDefaultDict(OrderedDict):
 
 
 class CamlMap(typing.Mapping):
-
     def __init__(self):
         self._ = []
 
@@ -112,23 +112,32 @@ def process(fn, bound_names):
     if isinstance(fn, _AutoContext):
         fn = fn.fn
 
-    if not bound_names:
-        return fn, get_ast(fn.__code__)
-
     # noinspection PyArgumentList,PyArgumentList
-    if isinstance(fn, FnCodeStr):
-        assign_code_str = "ctx = state.ctx\n" + "\n".join("{0} = ctx.get({0!r})".format(name) for name in bound_names)
-        code = "def {0}({1}):\n{2}".format(fn.fn_name, ", ".join(fn.fn_args),
-                                           textwrap.indent(f'{assign_code_str}\n{fn.code}', " " * 4))
+    if isinstance(fn, _FnCodeStr):
+
+        assign_code_str = '{syms} = map(state.ctx.get, {names})'.format(
+            syms=', '.join(bound_names) + ',', names=repr(bound_names))
+
+        code = "def {0}({1}):\n{2}".format(
+            fn.fn_name, ", ".join(fn.fn_args),
+            textwrap.indent(assign_code_str + '\n' + fn.code, "    "))
+
         module_ast = ast.parse(code, fn.filename)
 
-        bound_name_line_inc = int(bool(bound_names)) + len(bound_names) + 1
-        module_ast: ast.Module = ast.increment_lineno(module_ast, fn.lineno - bound_name_line_inc)
+        bound_name_line_inc = int(bool(bound_names)) + 1
+
+        module_ast: ast.Module = ast.increment_lineno(
+            module_ast, fn.lineno - bound_name_line_inc)
+
         fn_ast = module_ast.body[0]
+
         if isinstance(fn_ast.body[-1], ast.Expr):
+            # auto addition of tail expr return
             # in rbnf you don't need to write return if the last statement in the end is an expression.
             it: ast.Expr = fn_ast.body[-1]
-            fn_ast.body[-1] = ast.Return(lineno=it.lineno, col_offset=it.col_offset, value=it.value)
+
+            fn_ast.body[-1] = ast.Return(
+                lineno=it.lineno, col_offset=it.col_offset, value=it.value)
 
         filename = fn.filename
         name = fn.fn_name
@@ -136,17 +145,24 @@ def process(fn, bound_names):
         code_object = compile(module_ast, filename, "exec")
 
         local = {}
+        # TODO: using types.MethodType here to create the function object leads to various problems.
+        # Actually I don't really known why util now.
         exec(code_object, fn.namespace, local)
         ret = local[name]
 
     else:
+        if not bound_names:
+            return fn, get_ast(fn)
+
         code = fn.__code__
-        assigns = ast.parse(
-            "ctx = state.ctx\n" + "\n".join("{0} = ctx.get({0!r})".format(name) for name in bound_names))
-        module_ast = get_ast(fn.__code__)
+        assigns = ast.parse("ctx = state.ctx\n" + "\n".join(
+            "{0} = ctx.get({0!r})".format(name) for name in bound_names))
+
+        module_ast = get_ast(fn)
         fn_ast: ast.FunctionDef = module_ast.body[0]
         fn_ast.body = assigns.body + fn_ast.body
         module_ast = ast.Module([fn_ast])
+
         filename = code.co_filename
         name = code.co_name
         __defaults__ = fn.__defaults__
@@ -156,14 +172,16 @@ def process(fn, bound_names):
         code_object = compile(module_ast, filename, "exec")
 
         code_object = next(
-            each for each in code_object.co_consts if isinstance(each, types.CodeType) and each.co_name == name)
+            each for each in code_object.co_consts
+            if isinstance(each, types.CodeType) and each.co_name == name)
+
         # noinspection PyArgumentList,PyUnboundLocalVariable
-        ret = types.FunctionType(code_object, __globals__, name, __defaults__, __closure__)
+        ret = types.FunctionType(code_object, __globals__, name, __defaults__,
+                                 __closure__)
     return ret, module_ast
 
 
 class Parser(abc.ABC):
-
     @classmethod
     @abc.abstractmethod
     def bnf(cls):
@@ -186,7 +204,6 @@ class Parser(abc.ABC):
 
 
 class Lexer(abc.ABC):
-
     @classmethod
     @abc.abstractmethod
     def regex(cls) -> typing.Sequence[str]:
@@ -223,7 +240,7 @@ class Language:
         self.prefix = {}
         self.lazy_def = []
         # in rewrite/when/with clause, the global scope is exactly `Language.namespace`.
-        self.namespace = {**builtins.__dict__, __name__: '__main__'}
+        self.namespace = {**builtins.__dict__}
         self._lexer_factors = []
         self._is_built = False
         self._backend_imported = []
@@ -231,38 +248,53 @@ class Language:
         # for deep optimization
         self.has_compiled = set()
 
+    @property
+    def is_build(self):
+        return self._is_built
+
     def _kind(self, name):
         named_parser = self.named_parsers[name]
+
         if isinstance(named_parser, ParserC.Atom):
             return "ruiko.Parser"
+
         elif isinstance(named_parser, ParserC.Literal):
             return "ruiko.Lexer"
+
         raise TypeError
 
     def as_fixed(self):
+
         lang = self.implementation
-        impl = tuple(lang.values())
         lang['.has_compiled'] = self.has_compiled
-        for each, *_ in impl:
+
+        for each, *_ in tuple(lang.values()):
             each.as_fixed(lang)
 
-    @cast(reformat)
+    def dump(self, filename: str):
+        from Redy.Tools.PathLib import Path
+        with Path(filename).open('w') as fw:
+            fw.write(self.dumps())
+
+    @cast(_reformat)
     def dumps(self):
         static_method_prefix = '@staticmethod' + '\n'
         line_join = '\n'.join
 
-        code = line_join("\n"
-                         f"@{self.lang_name}\n"
-                         f"class {name}({self._kind(name)}):\n"
-                         f"{textwrap.indent(line_join(map(static_method_prefix.__add__ , spec_fn)), ' ' * 4)}\n"
-                         "" for name, spec_fn in self.dump_spec.items())
-        return (f"# File automatically generated by RBNF.\n"
-                f"{line_join(self._backend_imported)}\n"
-                f"from rbnf.bootstrap import loader as ruiko\n"
-                f"{self.lang_name} = ruiko.Language({self.lang_name!r})\n"
-                f"{code}"
-                f"{self.lang_name}.ignore({repr(list(self.ignore_lst.values()))[1:-1]})\n"
-                f"{self.lang_name}.build()\n")
+        code = line_join(
+            "\n"
+            f"@{self.lang_name}\n"
+            f"class {name}({self._kind(name)}):\n"
+            f"{textwrap.indent(line_join(map(static_method_prefix.__add__ , spec_fn)), ' ' * 4)}\n"
+            "" for name, spec_fn in self.dump_spec.items())
+        return (
+            f"# File automatically generated by RBNF.\n"
+            f"{line_join(self._backend_imported)}\n"
+            f"from rbnf.bootstrap import loader as ruiko\n"
+            f"{self.lang_name} = ruiko.Language({self.lang_name!r})\n"
+            f"{code}"
+            f"{self.lang_name}.ignore({repr(list(self.ignore_lst.values()))[1:-1]})\n"
+            f"{self.lang_name}.build()\n")
 
     def __call__(self, cls):
         cls.lang = self
@@ -300,7 +332,8 @@ class Language:
     # noinspection PyShadowingNames
     def build(self):
         if self._is_built:
-            raise LanguageBuiltError(f"Language {self.lang_name} is already built!")
+            raise LanguageBuildingError(
+                f"Language {self.lang_name} is already built!")
 
         def _process(fn, _binding_names):
             if hasattr(fn, '__isabstractmethod__') and fn.__isabstractmethod__:
@@ -369,7 +402,8 @@ class Language:
                 if constants:
                     if isinstance(constants, str):
                         constants = [constants]
-                    lexer_factors.append(ConstantLexerFactor(cls.__name__, constants))
+                    lexer_factors.append(
+                        ConstantLexerFactor(cls.__name__, constants))
 
                 cast = cls.cast()
                 if cast:
@@ -378,7 +412,8 @@ class Language:
 
                 prefix = cls.prefix()
                 if prefix:
-                    prefix_map[prefix] = ConstStrPool.cast_to_const(cls.__name__)
+                    prefix_map[prefix] = ConstStrPool.cast_to_const(
+                        cls.__name__)
 
                 dump_spec[cls.__name__] = list(lexer_spec_maker())
 
@@ -395,12 +430,16 @@ class Language:
                 rewrite, rewrite_ast = _process(cls.rewrite, binding_names)
 
                 lang[cls.__name__] = implementation, when, fail_if, rewrite
-                dump_spec[cls.__name__] = [f"def bnf():\n  return {dumps(implementation)}", *parser_spec_maker()]
+                dump_spec[cls.__name__] = [
+                    f"def bnf():\n  return {dumps(implementation)}",
+                    *parser_spec_maker()
+                ]
 
         def name_and_ty(e: LexerFactor):
             return e.name, type(e)
 
-        def merge(e: typing.Tuple[typing.Tuple[str, type], typing.List[LexerFactor]]):
+        def merge(e: typing.Tuple[typing.Tuple[str, type], typing.List[
+                LexerFactor]]):
             (lexer_group_name, lexer_ty), members = e
 
             def stream():
@@ -420,11 +459,8 @@ class Language:
 
         # @formatter:off
         # noinspection PyProtectedMember
-        lexer_table = (seq(lexer_factors)
-                       .chunk_by(name_and_ty)
-                       .map(merge)
-                       .map(lambda it: it.to_lexer())
-                       .to_list()._)
+        lexer_table = (seq(lexer_factors).chunk_by(name_and_ty).map(merge)
+                       .map(lambda it: it.to_lexer()).to_list()._)
         # @formatter:on
 
         @feature(staging)
@@ -435,8 +471,10 @@ class Language:
         def lexer(text: str):
             ignore_lst: const = self.ignore_lst
             cm: const = cast_map
-            result = constexpr[lexing](text, constexpr[lexer_table], cm if constexpr[cm] else None)
-            return filter(constexpr[filter_token], result) if constexpr[ignore_lst] else result
+            result = constexpr[lexing](text, constexpr[lexer_table], cm
+                                       if constexpr[cm] else None)
+            return filter(constexpr[filter_token],
+                          result) if constexpr[ignore_lst] else result
 
         self.lexer = lexer
         self._is_built = True

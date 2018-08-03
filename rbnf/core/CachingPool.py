@@ -2,6 +2,7 @@ from Redy.Magic.Classic import singleton
 from typing import Union
 lit = Union[str, bytes]
 
+
 @singleton
 class ConstStrPool:
     __slots__ = []

@@ -1,2 +1,2 @@
-class LanguageBuiltError(Exception):
+class LanguageBuildingError(Exception):
     pass

@@ -2,11 +2,10 @@ import operator
 import os
 import warnings
 from functools import reduce
-from rbnf.Color import Red, Green
-
 from rbnf.core.Optimize import optimize
 from rbnf.core.ParserC import Literal, Atom as _Atom, State
 from rbnf.core.Tokenizer import Tokenizer
+from rbnf.edsl.core import _FnCodeStr
 from rbnf.core import ParserC
 from rbnf.edsl import *
 from rbnf.edsl.rbnf_analyze import check_parsing_complete
@@ -17,7 +16,9 @@ from typing import Sequence
 import typing
 import builtins
 
-seq: object
+__all__ = ['rbnf', 'build_language', 'Language']
+
+seq: typing.Callable[[typing.Any], typing.Any]
 exec("from linq import Flow as seq")
 
 C = Literal.C
@@ -30,7 +31,6 @@ PatternName = str
 
 
 class _Wild:
-
     def __contains__(self, item):
         return True
 
@@ -42,8 +42,10 @@ class _Wild:
 
 
 class MetaState(State):
-
-    def __init__(self, lang_implementation, requires: typing.Union[_Wild, typing.Set[PatternName]], filename=None):
+    def __init__(self,
+                 lang_implementation,
+                 requires: typing.Union[_Wild, typing.Set[PatternName]],
+                 filename=None):
         super(MetaState, self).__init__(lang_implementation, filename)
         self.requires = requires
 
@@ -67,27 +69,28 @@ class CodeItem(Parser):
         return token.colno > begin_sign.colno
 
 
-class RewriteCode(FnCodeStr):
+class RewriteCode(_FnCodeStr):
     fn_args = "state",
     fn_name = "rewrite"
 
 
-class WhenCode(FnCodeStr):
+class WhenCode(_FnCodeStr):
     fn_args = "tokens", "state"
     fn_name = "when"
 
 
-class WithCode(FnCodeStr):
+class WithCode(_FnCodeStr):
     fn_args = "tokens", "state"
     fn_name = "fail_if"
 
 
 class Guide(Parser):
-    out_cls = FnCodeStr
+    out_cls = _FnCodeStr
 
     @classmethod
     def bnf(cls):
-        return optimize(C(cls.__name__.lower()) @ "sign" + CodeItem.one_or_more @ "expr")
+        return optimize(
+            C(cls.__name__.lower()) @ "sign" + CodeItem.one_or_more @ "expr")
 
     @classmethod
     @auto_context
@@ -97,7 +100,8 @@ class Guide(Parser):
         first = code_items[0].item
         code = recover_codes(each.item for each in code_items)
         # noinspection PyArgumentList
-        return cls.out_cls(code, first.lineno, first.colno, state.filename, state.data.namespace)
+        return cls.out_cls(code, first.lineno, first.colno, state.filename,
+                           state.data.namespace)
 
 
 @rbnf
@@ -120,15 +124,14 @@ class Rewrite(Guide):
 
 @rbnf
 class Primitive(Parser):
-
     @classmethod
     def bnf(cls):
         # @formatter:off
         return optimize(
-                 C('(') + Or @ "or_" + C(')')
-               | C('[') + Or @ "optional" + C(']')
-               | Name @ "name"
-               | Str  @ "str")
+            C('(') + Or @ "or_" + C(')')
+            | C('[') + Or @ "optional" + C(']')
+            | Name @ "name"
+            | Str @ "str")
         # @formatter:on
 
     @classmethod
@@ -173,20 +176,17 @@ class Primitive(Parser):
 
 @rbnf
 class Trail(Parser):
-
     @classmethod
     def bnf(cls):
         # @formatter:off
         return optimize(
-                (C('~') @ "rev" + Primitive @ "atom"
-                 | Primitive @ "atom"
-                    +  ( C('+') @ "one_or_more"
-                       | C('*') @ "zero_or_more"
-                       | C('{') + Number(1, 2) @ "interval" + C('}')
-                       ).optional
-                 ) + ( C('as') + Name @ "bind"
-                     | C("to") + C('[') @ "is_seq" + Name@"bind" + C("]")
-                     ).optional)
+            (C('~') @ "rev" + Primitive @ "atom"
+             | Primitive @ "atom" +
+             (C('+') @ "one_or_more"
+              | C('*') @ "zero_or_more"
+              | C('{') + Number(1, 2) @ "interval" + C('}')).optional) +
+            (C('as') + Name @ "bind"
+             | C("to") + C('[') @ "is_seq" + Name @ "bind" + C("]")).optional)
         # @formatter:on
 
     @classmethod
@@ -199,7 +199,6 @@ class Trail(Parser):
         interval: Sequence[Tokenizer]
         bind: Tokenizer
         is_seq: object
-        ctx: dict
 
         def delay():
             nonlocal atom
@@ -237,7 +236,6 @@ class Trail(Parser):
 
 @rbnf
 class And(Parser):
-
     @classmethod
     def bnf(cls):
         return Trail.one_or_more @ "and_seq"
@@ -255,7 +253,6 @@ class And(Parser):
 
 @rbnf
 class Or(Parser):
-
     @classmethod
     def bnf(cls):
         return optimize(And @ "head" + (C('|') + (And >> "tail")).unlimited)
@@ -270,25 +267,22 @@ class Or(Parser):
             if not tail:
                 return head()
 
-            return optimize(reduce(operator.or_, [each() for each in tail], head()))
+            return optimize(
+                reduce(operator.or_, [each() for each in tail], head()))
 
         return delay
 
 
 @rbnf
 class Import(Parser):
-
     @classmethod
     def bnf(cls):
         # @formatter:off
         return optimize(
-                    ((C("[") + Name @ "language" + C("]")).optional
-                     + C("import")
-                     | C("pyimport") @ "python"
-                    )
-                    + Name @ "head"
-                    + (C('.') + (C('*') | Name >> "tail")).unlimited
-                    +  C('.') + C('[') + (C('*') | Name.unlimited @ "import_items") + C(']'))
+            ((C("[") + Name @ "language" + C("]")).optional + C("import")
+             | C("pyimport") @ "python") + Name @ "head" +
+            (C('.') + (C('*') | Name >> "tail")).unlimited + C('.') + C('[') +
+            (C('*') | Name.unlimited @ "import_items") + C(']'))
         # @formatter:on
 
     @staticmethod
@@ -307,8 +301,9 @@ class Import(Parser):
 
         if language or python:
             if python:
-                warnings.warn("keyword `pyimport` is deprecated, "
-                              "use [python] import instead.", DeprecationWarning)
+                warnings.warn(
+                    "keyword `pyimport` is deprecated, "
+                    "use [python] import instead.", DeprecationWarning)
             else:
                 language = language.value
                 if language != "python":
@@ -317,7 +312,8 @@ class Import(Parser):
 
             lang: Language = state.data
             from_item = ".".join(path_secs)
-            import_items = "*" if isinstance(requires, _Wild) else "({})".format(', '.join(requires))
+            import_items = "*" if isinstance(
+                requires, _Wild) else "({})".format(', '.join(requires))
             import_stmt = f"from {from_item} import {import_items}"
             lang._backend_imported.append(import_stmt)
             exec(import_stmt, lang.namespace)
@@ -343,7 +339,10 @@ class Import(Parser):
                     continue
 
                 with path.open('r') as file:
-                    state = MetaState(rbnf.implementation, requires=requires, filename=str(path))
+                    state = MetaState(
+                        rbnf.implementation,
+                        requires=requires,
+                        filename=str(path))
                     state.data = lang
                     _build_language(file.read(), state=state)
                 if not requires:
@@ -355,10 +354,10 @@ class Import(Parser):
 
 @rbnf
 class Ignore(Parser):
-
     @classmethod
     def bnf(cls):
-        return optimize(C("ignore") + C('[') + Name.one_or_more @ "names" + C(']'))
+        return optimize(
+            C("ignore") + C('[') + Name.one_or_more @ "names" + C(']'))
 
     @classmethod
     @auto_context
@@ -370,22 +369,19 @@ class Ignore(Parser):
 
 @rbnf
 class UParser(Parser):
-
     @classmethod
     def bnf(cls):
         # @formatter:off
-        return optimize(Name @ "name" + C('::=')
-                        + C('|').optional
-                        + Or @ "impl"
-                        + When.optional    @ "when"
-                        + With.optional    @ "fail_if"
-                        + Rewrite.optional @ "rewrite")
+        return optimize(Name @ "name" + C('::=') + C('|').optional +
+                        Or @ "impl" + When.optional @ "when" +
+                        With.optional @ "fail_if" +
+                        Rewrite.optional @ "rewrite")
         #  @formatter:on
 
     @classmethod
     @auto_context
     def rewrite(cls, state: MetaState):
-        name: Tokenizer
+        name:...
         impl: ParserC.Parser
         when: When.Data
         fail_if: With.Data
@@ -406,30 +402,27 @@ class UParser(Parser):
             methods['rewrite'] = rewrite[0]
 
         methods['bnf'] = lambda: impl()
-        lang(type(name, (Parser,), methods))
+        lang(type(name, (Parser, ), methods))
         state.requires.remove(name)
 
 
 @rbnf
 class ULexer(Parser):
-
     @classmethod
     def bnf(cls):
         # @formatter:off
-        return optimize(
-            Name @ "name" + C('cast').optional @ "cast"
-            + (C('as') + Name @ "new_prefix").optional
-            +  C(':=')
-            +  C('|').optional + Str.one_or_more @ "lexer_factors")
+        return optimize(Name @ "name" + C('cast').optional @ "cast" +
+                        (C('as') + Name @ "new_prefix").optional + C(':=') +
+                        C('|').optional + Str.one_or_more @ "lexer_factors")
         # @formatter:on
 
     @classmethod
     @auto_context
     def rewrite(cls, state: MetaState):
-        name: Tokenizer
-        cast: typing.Optional
-        new_prefix: Tokenizer
-        lexer_factors: typing.List[Tokenizer]
+        name:...
+        cast:...
+        new_prefix:...
+        lexer_factors:...
         lang: Language = state.data
         new_prefix = new_prefix
 
@@ -444,12 +437,17 @@ class ULexer(Parser):
                 return "regex"
             elif v.startswith("'"):
                 return "constants"
-            raise ValueError(f"Unexpected prefixed string `{v}` at lineno {tk.lineno}, column {tk.colno}.")
+            raise ValueError(
+                f"Unexpected prefixed string `{v}` at lineno {tk.lineno}, column {tk.colno}."
+            )
 
         lexer_groups = seq(lexer_factors).group_by(split_regex_and_constants)._
-        regex, constants = (lexer_groups[each] for each in ('regex', 'constants'))
+        regex, constants = (lexer_groups[each]
+                            for each in ('regex', 'constants'))
         regex = [each[2:-1] for each in seq(regex).map(lambda _: _.value)._]
-        constants = [each[1:-1] for each in seq(constants).map(lambda _: _.value)._]
+        constants = [
+            each[1:-1] for each in seq(constants).map(lambda _: _.value)._
+        ]
 
         methods = {'regex': lambda: regex, 'constants': lambda: constants}
         if cast:
@@ -458,13 +456,12 @@ class ULexer(Parser):
             new_prefix = new_prefix.value
             methods['prefix'] = lambda: new_prefix
 
-        lang(type(name, (Lexer,), methods))
+        lang(type(name, (Lexer, ), methods))
         state.requires.remove(name)
 
 
 @rbnf
 class Statement(Parser):
-
     @classmethod
     def bnf(cls):
         return Import @ "import_" | UParser @ "parser" | ULexer @ "lexer" | Ignore @ 'ignore'
@@ -472,7 +469,6 @@ class Statement(Parser):
 
 @rbnf
 class Grammar(Parser):
-
     @classmethod
     def bnf(cls):
         return optimize(END.unlimited + (Statement + END.unlimited).unlimited)
@@ -500,8 +496,11 @@ def _build_language(text: str, state):
     check_parsing_complete(text, tokens, state)
 
 
-def build_language(text, lang: Language, filename):
+def build_language(source_code: str, lang: Language, filename: str):
+    """
+    lang:      language object represents your language.
+    """
     state = MetaState(rbnf.implementation, requires=_Wild(), filename=filename)
     state.data = lang
-    _build_language(text, state)
+    _build_language(source_code, state)
     lang.build()

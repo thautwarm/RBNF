@@ -26,7 +26,6 @@ class ConsInd(traits.Ind):  # index following constructing
 
 
 class Parser(abc.ABC):
-
     def dumps(self):
         return self.dumps()
 
@@ -97,12 +96,14 @@ class Literal(Parser, ConsInd, traits.Dense, traits.Im):
     R: RDT[lambda regex: [[make_regex_matcher(regex)], f'R{regex.__repr__()}']]
 
     # match by runtime string(equals)
-    V: RDT[lambda runtime_str: [[make_runtime_str_matcher(runtime_str)], f'V{runtime_str.__repr__()}']]
+    V: RDT[
+        lambda runtime_str: [[make_runtime_str_matcher(runtime_str)], f'V{runtime_str.__repr__()}']]
 
     # match by name -> const string
     N: RDT[lambda name: [[make_name_matcher(name)], f'N{name.__repr__()}']]
 
-    C: RDT[lambda const_string: [[make_const_str_matcher(const_string)], f'{const_string.__repr__()}']]
+    C: RDT[
+        lambda const_string: [[make_const_str_matcher(const_string)], f'{const_string.__repr__()}']]
 
     NC: RDT[lambda name, const_string: [[make_name_and_const_str_matcher(name, const_string)],
                                         f'<{name}>{const_string.__repr__()}']]
@@ -128,7 +129,8 @@ class Literal(Parser, ConsInd, traits.Dense, traits.Im):
 class Atom(Parser, ConsInd, traits.Dense, traits.Im):
     Bind: lambda name, or_parser: f'({or_parser}) as {name}'
     Push: lambda name, or_parser: f'({or_parser}) to {name}'
-    Named: RDT[lambda ref_name: [[ConstStrPool.cast_to_const(ref_name)], ref_name]]
+    Named: RDT[
+        lambda ref_name: [[ConstStrPool.cast_to_const(ref_name)], ref_name]]
     Any: '_'
 
     @Pattern

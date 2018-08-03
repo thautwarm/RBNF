@@ -39,7 +39,8 @@ def optimize(parser: Parser) -> Parser:
 @optimize.case(Composed.And)
 def optimize(and_: Composed.And) -> Parser:
     parsers: List[Parser] = and_[1]
-    return optimize(parsers[0]) if len(parsers) is 1 else Composed.And(list(map(optimize, parsers)))
+    return optimize(parsers[0]) if len(parsers) is 1 else Composed.And(
+        list(map(optimize, parsers)))
 
 
 @optimize.case(Composed.Or)
@@ -50,7 +51,8 @@ def optimize(or_: Composed.Or) -> Parser:
         return optimize(parsers[0])
 
     ands = [and_[1] if and_[0] is Composed.And else [and_] for and_ in parsers]
-    groups: Dict[str, List[List[Parser]]] = well_group_by(lambda x: str(x[0]))(ands)
+    groups: Dict[str, List[List[Parser]]] = well_group_by(lambda x: str(x[0]))(
+        ands)
     cases = []
 
     for each_group in groups.values():
@@ -59,14 +61,21 @@ def optimize(or_: Composed.Or) -> Parser:
             cases.append(optimize(Composed.And(each)))
 
         elif any(map(lambda x: len(x) is 1, each_group)):
-            left = list(map(lambda x: Composed.And(x[1:]), filter(lambda x: len(x) is not 1, each_group)))
+            left = list(
+                map(lambda x: Composed.And(x[1:]),
+                    filter(lambda x: len(x) is not 1, each_group)))
             head = next(filter(lambda x: len(x) is 1, each_group))[0]
-            cases.append(Composed.And([optimize(head), optimize(Composed.Or(left))(0, 1)]))
+            cases.append(
+                Composed.And(
+                    [optimize(head),
+                     optimize(Composed.Or(left))(0, 1)]))
 
         else:
             head: Parser = each_group[0][0]
             left = list(map(lambda x: Composed.And(x[1:]), each_group))
-            cases.append(Composed.And([optimize(head), optimize(Composed.Or(left))]))
+            cases.append(
+                Composed.And([optimize(head),
+                              optimize(Composed.Or(left))]))
 
     if len(cases) is 1:
         return cases[0]
@@ -74,4 +83,5 @@ def optimize(or_: Composed.Or) -> Parser:
 
 
 @optimize.case(any)
-def optimize(_) -> Parser: return _
+def optimize(_) -> Parser:
+    return _

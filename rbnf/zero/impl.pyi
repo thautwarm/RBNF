@@ -16,20 +16,31 @@ class ZeroExp:
     _lang: Language
     ctx: dict
 
-    def __init__(self, bnf_syntax: str, use: str, custom_lexer_wrapper=None, language_name: str = None,
-                 filename='<zero>'): ...
+    def __init__(self,
+                 bnf_syntax: str,
+                 use: str,
+                 custom_lexer_wrapper=None,
+                 language_name: str = None,
+                 filename='<zero>'):
+        ...
 
-    def match(self, text) -> ResultDescription: ...
+    @property
+    def lang(self) -> Language:
+        ...
 
-    def dumps(self) -> str:  ...
+    def match(self, text) -> ResultDescription:
+        ...
 
-    def dump(self, file_repr: typing.Union[str, io.BufferedWriter]):
-        if isinstance(file_repr, str):
-            file_repr = Path(file_repr).open('w')
+    def dumps(self) -> str:
+        ...
 
-        with file_repr:
-            file_repr.write(self.dumps())
+    def dump(self, file_repr: typing.Union[str, Path, io.BufferedWriter]):
+        ...
 
 
-def compile(bnf_syntax: str, use: str = None, custom_lexer_wrapper=None, language_name: str = None,
-            filename=None) -> ZeroExp: ...
+def compile(bnf_syntax: str,
+            use: str = None,
+            custom_lexer_wrapper=None,
+            language_name: str = None,
+            filename=None) -> ZeroExp:
+    ...

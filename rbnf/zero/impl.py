@@ -9,7 +9,12 @@ __all__ = ['compile', 'ResultDescription']
 
 
 class ZeroExp:
-    def __init__(self, bnf_syntax: str, use: str, custom_lexer_wrapper=None, language_name=None, filename="<zero>"):
+    def __init__(self,
+                 bnf_syntax: str,
+                 use: str,
+                 custom_lexer_wrapper=None,
+                 language_name=None,
+                 filename="<zero>"):
         from rbnf.core.State import State
         from rbnf.bootstrap.rbnf import Language, build_language
 
@@ -29,28 +34,47 @@ class ZeroExp:
 
         @feature(const, constexpr)
         def match(text) -> ResultDescription:
-            _state = constexpr[State](constexpr[impl])
             _wrapper: const = custom_lexer_wrapper
             _lexer: const = lexer
-            _tokens = tuple(_wrapper(_lexer(text)) if constexpr[custom_lexer_wrapper] else _lexer(text))
+
+            _state = constexpr[State](constexpr[impl])
+
+            _tokens = tuple(
+                _wrapper(_lexer(text))
+                if constexpr[custom_lexer_wrapper] else _lexer(text))
+
             _result: Result = constexpr[top_parser.match](_tokens, _state)
+
             return constexpr[ResultDescription](_state, _result.value, _tokens)
 
         self.match = match
 
+    @property
+    def lang(self):
+        return self._lang
+
     def dumps(self):
         return self._lang.dumps()
 
-    def dump(self, file_repr: typing.Union[str, io.BufferedWriter]):
+    def dump(self, file_repr: typing.Union[str, io.TextIOWrapper, Path]):
         if isinstance(file_repr, str):
-            file_repr = Path(file_repr).open('w')
+            return self.dump(Path(file_repr))
+
+        if isinstance(file_repr, Path):
+            return self.dump(file_repr.open('w'))
 
         with file_repr:
             file_repr.write(self.dumps())
 
 
-def compile(bnf_syntax: str, use: str = None, custom_lexer_wrapper=None, language_name=None, filename="zero"):
-    return ZeroExp(bnf_syntax, use,
-                   custom_lexer_wrapper=custom_lexer_wrapper,
-                   language_name=language_name,
-                   filename=filename)
+def compile(bnf_syntax: str,
+            use: str = None,
+            custom_lexer_wrapper=None,
+            language_name=None,
+            filename="zero"):
+    return ZeroExp(
+        bnf_syntax,
+        use,
+        custom_lexer_wrapper=custom_lexer_wrapper,
+        language_name=language_name,
+        filename=filename)

@@ -7,9 +7,9 @@ __all__ = ['Status', 'Result', 'Matched', 'Unmatched', 'FindLR']
 
 @data
 class Status:
-    Matched: ...
-    Unmatched: ...
-    FindLR: ...
+    Matched:...
+    Unmatched:...
+    FindLR:...
 
 
 Matched: Status = Status.Matched
@@ -30,7 +30,8 @@ class Result:
 
     def __str__(self):
         return {
-            Unmatched: lambda: Red("Unmatched"), Matched: lambda: Green(str(self.value)),
+            Unmatched: lambda: Red("Unmatched"),
+            Matched: lambda: Green(str(self.value)),
             FindLR: lambda: Blue(f"Find left recursion.")
         }[self.status]()
 

@@ -3,9 +3,9 @@ from rbnf.core import ParserC
 from rbnf.core.ParserC import State, Literal, ConstStrPool
 from rbnf.core.Result import Result
 from rbnf.core.Tokenizer import Tokenizer
-from rbnf.err import LanguageBuiltError
+from rbnf.err import LanguageBuildingError
 from rbnf.auto_lexer import lexing
-from rbnf._py_tools.unparse import Unparser
+from rbnf.py_tools.unparse import Unparser
 from collections import OrderedDict, defaultdict
 from Redy.Opt import Macro, feature, constexpr, const
 from Redy.Opt import get_ast
@@ -21,17 +21,18 @@ import builtins
 import io
 import warnings
 
-__all__ = ['Parser', 'Lexer', 'Language', 'auto_context', 'FnCodeStr']
+__all__ = ['Parser', 'Lexer', 'Language', 'auto_context', '_FnCodeStr']
 
 
 class AutoContext:
     fn: 'function'
 
 
-def auto_context(fn) -> AutoContext: ...
+def auto_context(fn) -> AutoContext:
+    ...
 
 
-class FnCodeStr(typing.NamedTuple):
+class _FnCodeStr(typing.NamedTuple):
     code: str
     lineno: int
     colno: int
@@ -47,28 +48,38 @@ class _ParserLike(abc.ABC):
     def match(self, tokenizers: Sequence[Tokenizer], state: State) -> Result:
         return self.match(tokenizers, state)
 
-    def repeat(self, least, most=-1) -> 'Parser': ...
+    def repeat(self, least, most=-1) -> 'Parser':
+        ...
 
     @property
-    def one_or_more(self) -> Parser: ...
+    def one_or_more(self) -> Parser:
+        ...
 
     @property
-    def unlimited(self) -> Parser: ...
+    def unlimited(self) -> Parser:
+        ...
 
     @property
-    def optional(self) -> Parser: ...
+    def optional(self) -> Parser:
+        ...
 
-    def __call__(self, least, most=-1) -> 'Parser': ...
+    def __call__(self, least, most=-1) -> 'Parser':
+        ...
 
-    def __invert__(self) -> Parser: ...
+    def __invert__(self) -> Parser:
+        ...
 
-    def __rshift__(self, other: str) -> Parser: ...
+    def __rshift__(self, other: str) -> Parser:
+        ...
 
-    def __matmul__(self, other: str) -> Parser: ...
+    def __matmul__(self, other: str) -> Parser:
+        ...
 
-    def __or__(self, other) -> Parser: ...
+    def __or__(self, other) -> Parser:
+        ...
 
-    def __add__(self, other) -> Parser: ...
+    def __add__(self, other) -> Parser:
+        ...
 
 
 class OrderedDefaultDict(OrderedDict):
@@ -83,7 +94,6 @@ class OrderedDefaultDict(OrderedDict):
 
 
 class CamlMap(typing.Mapping[T1, T2]):
-
     def __init__(self):
         self._ = []
 
@@ -109,7 +119,6 @@ class CamlMap(typing.Mapping[T1, T2]):
 
 
 class Parser(_ParserLike):
-
     @staticmethod
     def bnf():
         raise NotImplemented
@@ -128,7 +137,6 @@ class Parser(_ParserLike):
 
 
 class Lexer(_ParserLike):
-
     @staticmethod
     def regex() -> typing.Sequence[str]:
         return []
@@ -151,21 +159,34 @@ _nullable_fn = typing.Optional[types.FunctionType]
 
 class Language:
     lexer: typing.Callable[[str], Sequence[Tokenizer]]
-    named_parsers: CamlMap[str, typing.Union[ParserC.Atom.Named, ParserC.Literal.N]]
-    implementation: typing.Dict[str, typing.Tuple[ParserC.Parser, _nullable_fn, _nullable_fn, _nullable_fn]]
+    named_parsers: CamlMap[str, typing.Union[ParserC.Atom.Named,
+                                             ParserC.Literal.N]]
+    implementation: typing.Dict[str, typing.Tuple[ParserC.Parser, _nullable_fn,
+                                                  _nullable_fn, _nullable_fn]]
     prefix: typing.Dict[str, str]
     lang_name: str
     namespace = {}
     ignore_lst = {}
     dump_spec: CamlMap[str, typing.Tuple[str]]
 
-    def __init__(self, lang_name: str): ...
+    def __init__(self, lang_name: str):
+        ...
 
-    def __call__(self, *args, **kwargs) -> ParserC.Parser: ...
+    def __call__(self, *args, **kwargs) -> ParserC.Parser:
+        ...
 
-    def build(self): ...
+    @property
+    def is_build(self) -> bool:
+        ...
 
-    def dumps(self) -> str: ...
+    def build(self):
+        ...
+
+    def dump(self, filename: str):
+        ...
+
+    def dumps(self) -> str:
+        ...
 
     def as_fixed(self) -> None:
         """
