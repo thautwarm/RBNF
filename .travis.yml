@@ -5,6 +5,7 @@ python:
   - "3.7-dev"
 install:
   - pip install codecov coverage pytest==3.3.2 python_coveralls
+  - python setup.py install
 
 script:
   - coverage run --m tests
