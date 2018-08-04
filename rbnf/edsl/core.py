@@ -28,7 +28,7 @@ try:
 except ModuleNotFoundError:
     warnings.warn("Install yapf to reformat generated code!", UserWarning, 2)
 
-    def reformat(ret):
+    def _reformat(ret):
         return ret
 
 
