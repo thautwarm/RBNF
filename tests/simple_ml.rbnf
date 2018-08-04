@@ -1,0 +1,123 @@
+import std.common.[Name Space Number DoubleQuotedStr Comment]
+[python] import simple_ml_ast.[*]
+ignore [Space]
+
+SingleQuote := R'\''
+keyword cast := 'let' 'in' 'type' 'fn' 'of' 'rec' 'if' 'then' 'else' 'true' 'false' 'alias'
+
+operator_have_to_pre_announce := '=>'
+
+
+Sym ::= Name as n
+        rewrite Id(n.value)
+
+
+Str ::= DoubleQuotedStr+ as seq
+        rewrite
+            Const(''.join(e.value for e in seq))
+
+Num ::= Number as num
+        rewrite
+            Const(int(num.value))
+
+Bool ::= 'true' as t | 'false'
+        rewrite
+            Const(True) if t else Const(False)
+
+
+Let ::=
+    | 'let' Name as tag [':' Type as annotate] '=' Expr as value 'in' Expr as do
+    rewrite
+        Let(tag.value, annotate, value, do)
+
+If  ::=
+    'if' Expr as test 'then' Expr as body
+    'else' Expr as else_do
+    rewrite
+        If(test, body, else_do)
+
+Expr ::= | Let as v
+         | App as v
+         | If  as v
+         rewrite v
+
+App  ::= Atom+ as seq
+         rewrite
+            head, *tail = seq
+            if tail:
+                for e in tail:
+                    head = App(head, e)
+            head
+
+Lam ::= 'fn' Sym as sym [':' Type as annotate] '->' Expr as ret
+         rewrite
+            Lam(sym, annotate, ret)
+
+
+NestedExpr ::=
+        | '(' Expr as head (',' Expr)* as tail [',' as mark] ')'
+        | '(' ')'
+        rewrite
+            unit if not head else\
+            (Tuple((head, ))
+                if mark else head) if not tail else\
+            Tuple((head, *tail[1::2]))
+
+
+Atom ::= | NestedExpr as v [':' Type as ty]
+         | (Num | Bool | Sym | Str | Lam ) as v  [':' Type as ty]
+         rewrite Annotate(v, ty) if ty else v
+
+
+Type    ::= | ComposedType as composed
+            | '(' Type     as nested ')'
+            rewrite
+                composed if composed else\
+                nested   if nested   else\
+                TypeInduct(TypeSym(name.value), args) if args else\
+                TypeSym(name.value) if name else\
+                TypeSlot(undecided.value)
+
+ComposedType
+        ::= | FunctionType as head ('*' FunctionType)* as tail
+            rewrite
+                TypeJoin((head, *tail[1::2])) if tail else head
+
+FunctionType
+        ::= AtomType as arg ['=>' AtomType as ret]
+        rewrite
+            TypeFunction(arg, ret) if ret else arg
+
+AtomType
+        ::= | '(' Type     as nested ')'
+            | Name as name ['of' Type as args]  #TODO generic: T['a, 'b] not T of 'a, 'b anymore
+            | SingleQuote Name as undecided
+            rewrite
+                nested if nested else\
+                TypeInduct(TypeSym(name.value), args) if args else\
+                TypeSym(name.value) if name else\
+                TypeSlot(undecided.value)
+
+TypeFormalArg ::= SingleQuote Name as name
+                rewrite
+                    name.value
+
+TypeFormalArgSeq ::= TypeFormalArg as head (',' TypeFormalArg)* as tail
+                    rewrite
+                        (head, *tail[1::2])
+TypeDef ::= 'type' Name as name ['[' TypeFormalArgSeq as args ']'] '=' Type as expand
+            rewrite
+                TypeDef(name.value, args if args else (), expand)
+
+TypeAbbr ::= 'alias' Name as name '=' Type as expand
+             rewrite TypeAbbr(name.value, expand)
+
+
+Stmt ::= | Expr     as v
+         | TypeDef  as v
+         | TypeAbbr as v
+         rewrite v
+
+Grammar  ::= (Stmt [';'])+ as seq
+            rewrite
+                Stmts(tuple(e for e in seq if Eq in e.__class__.__mro__))

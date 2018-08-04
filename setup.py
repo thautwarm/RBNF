@@ -2,9 +2,8 @@ from setuptools import setup
 from Redy.Tools.Version import Version
 from Redy.Tools.PathLib import Path
 
-# with open('./README.rst', encoding='utf-8') as f:
-#     readme = f.read()
-readme = ''
+with open('./README.md', encoding='utf-8') as f:
+    readme = f.read()
 
 version_filename = 'next_version'
 with open(version_filename) as f:
@@ -20,6 +19,7 @@ setup(
     keywords='parser-generator, context-sensitive, ebnf',
     description="context sensitive grammar parser generator for CPython",
     long_description=readme,
+    long_description_content_type='text/markdown',
     license='MIT',
     python_requires='>=3.6.0',
     url='https://github.com/thautwarm/Ruiko',

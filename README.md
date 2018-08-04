@@ -2,6 +2,11 @@
 RBNF: Parser Generator for Context Sensitive Grammars
 ==========================================================
 
+[![Build Status](https://travis-ci.org/thautwarm/RBNF.svg?branch=master)](https://travis-ci.org/thautwarm/RBNF.svg?branch=master)
+[![PyPI version](https://img.shields.io/pypi/v/RBNF.svg)](https://pypi.python.org/pypi/rbnf)
+[![MIT License](https://img.shields.io/badge/license-MIT-Green.svg?style=flat)](https://github.com/thautwarm/RBNF/blob/master/LICENSE)
+
+
 Preview
 ---------------
 

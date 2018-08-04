@@ -269,7 +269,8 @@ class Language:
         lang['.has_compiled'] = self.has_compiled
 
         for each, *_ in tuple(lang.values()):
-            each.as_fixed(lang)
+            if isinstance(each, ParserC.Parser):
+                each.as_fixed(lang)
 
     def dump(self, filename: str):
         from Redy.Tools.PathLib import Path
@@ -349,17 +350,6 @@ class Language:
                 return types.MethodType(fn_, fn.__self__), ast_
 
             return process(fn, _binding_names)
-
-        def _get_ast(fn):
-            if hasattr(fn, '__isabstractmethod__') and fn.__isabstractmethod__:
-                return None
-            if isinstance(fn, classmethod):
-                # noinspection PyTypeChecker
-                return _get_ast(fn.__func__)
-            if isinstance(fn, types.MethodType):
-                # noinspection PyTypeChecker
-                return _get_ast(fn.__func__)
-            return get_ast(fn.__code__)
 
         cast_map = {}
         lexer_factors = self._lexer_factors
