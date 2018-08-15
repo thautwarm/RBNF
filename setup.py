@@ -37,7 +37,7 @@ setup(
             'rbnf_libs/*.rbnf'
         ]
     },
-    install_requires=['linq-t>=0.1', 'Redy>=0.2.2', 'rtpy>=0.2.8'],
+    install_requires=['linq-t>=0.1', 'Redy>=0.2.2', 'wisepy>=0.2.8'],
     platforms='any',
     classifiers=[
         'Programming Language :: Python :: 3.6',
