@@ -22,3 +22,12 @@ pip install -U Redy rbnf
 python repl.py
 
 ```
+
+如何让parser成为解释器
+-------------------------
+
+查看`calc-immediately.rbnf`是怎么做到的。
+然后直接运行它:
+```
+rbnf run calc-immediately.rbnf
+```

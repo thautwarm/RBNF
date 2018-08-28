@@ -1,0 +1,44 @@
+import std.common.[Number Space]
+[python] import functools.[reduce]
+[python] import operator.[add sub mul truediv floordiv mod]
+ignore [Space]
+
+Numeric ::= ['-' as neg] Number as integral ['.' Number as floating]
+            rewrite
+                r = float(integral.value + '.' + floating.value) if floating else int(integral.value)
+                -r if neg else r
+
+Pow ::= (Atom (('**' | '^') Atom)*) as seq
+        rewrite reduce(lambda b, a: a ** b, seq[::-2])
+
+Mul ::= Pow as head (('*' | '/' | '//' | '%') as op Pow)* as tail
+        rewrite
+            if tail:
+                op = None
+                for each in tail:
+                    if op is None:
+                        op = {
+                            '*' : mul, '/' : truediv, '//': floordiv, '%' : mod
+                        }[each.value]
+                    else:
+                        head = op(head, each)
+                        op = None
+            head
+
+Atom ::= Numeric as value | '(' Add as value ')'
+         rewrite value
+
+
+Add ::= Mul as head (('+' | '-') as op Mul)* as tail
+        rewrite
+            if tail:
+                op = None
+                for each in tail:
+                    if op is None:
+                        op = {'+': add, '-': sub}[each.value]
+                    else:
+                        head = op(head, each)
+                        op = None
+            head
+
+
