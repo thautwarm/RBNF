@@ -1,8 +1,10 @@
 import rbnf.zero as ze
-import sys
+import sys, os
 from rbnf.easy import build_parser
 from Redy.Tools.PathLib import Path
-sys.path.append(Path(__file__).parent().__str__())
+pwd = Path(__file__).parent().__str__()
+sys.path.append(pwd)
+os.chdir(pwd)
 ze_exp = ze.compile('import simple_ml.[*]', use='Grammar')
 
 
