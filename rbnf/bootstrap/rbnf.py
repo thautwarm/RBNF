@@ -22,6 +22,7 @@ seq: typing.Callable[[typing.Any], typing.Any]
 exec("from linq import Flow as seq")
 
 C = Literal.C
+V = Literal.V
 N = Literal.N
 NC = Literal.NC
 
@@ -119,7 +120,11 @@ class When(Guide):
 @rbnf
 class Rewrite(Guide):
     out_cls = RewriteCode
-    pass
+
+    @classmethod
+    def bnf(cls):
+        return optimize((C('rewrite') | C('->')) @ "sign" +
+                        CodeItem.one_or_more @ "expr")
 
 
 @rbnf
@@ -179,14 +184,21 @@ class Trail(Parser):
     @classmethod
     def bnf(cls):
         # @formatter:off
-        return optimize(
-            (C('~') @ "rev" + Primitive @ "atom"
-             | Primitive @ "atom" +
-             (C('+') @ "one_or_more"
-              | C('*') @ "zero_or_more"
-              | C('{') + Number(1, 2) @ "interval" + C('}')).optional) +
+        a = optimize(
+            C('~') @ "rev" + Primitive @ "atom"
+            | Primitive @ "atom" +
+            (C('+') @ "one_or_more"
+             | C('*') @ "zero_or_more"
+             | C('{') + Number(1, 2) @ "interval" + C('}')).optional)
+
+        left_assign = optimize(Name @ "bind" + C("=")
+                               | Name @ "bind" + C("<<") @ "is_seq") + a
+
+        right_assign = a + optimize(
             (C('as') + Name @ "bind"
              | C("to") + C('[') @ "is_seq" + Name @ "bind" + C("]")).optional)
+
+        return optimize(left_assign | right_assign)
         # @formatter:on
 
     @classmethod
@@ -411,20 +423,28 @@ class ULexer(Parser):
     @classmethod
     def bnf(cls):
         # @formatter:off
-        return optimize(Name @ "name" + C('cast').optional @ "cast" +
-                        (C('as') + Name @ "new_prefix").optional + C(':=') +
-                        C('|').optional + Str.one_or_more @ "lexer_factors")
+        a = optimize(Name @ "name" + C('cast').optional @ "cast" +
+                     (C('as') + Name @ "new_prefix").optional + C(':=') +
+                     C('|').optional + Str.one_or_more @ "lexer_factors")
+        b = optimize(
+            V("keyword") @ "keyword" + Name @ "name" + C(':=') + C("|") +
+            Str.one_or_more @ "lexer_factors")
+        return a | b
         # @formatter:on
 
     @classmethod
     @auto_context
     def rewrite(cls, state: MetaState):
+        keyword:...
         name:...
         cast:...
         new_prefix:...
         lexer_factors:...
         lang: Language = state.data
         new_prefix = new_prefix
+
+        if keyword:
+            cast = True
 
         requires = state.requires
         name = name.value

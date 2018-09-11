@@ -67,7 +67,6 @@ def unparse(ast: ast.AST):
 def auto_context(fn):
     return _AutoContext(fn)
 
-
 class OrderedDefaultDict(OrderedDict):
     cons: typing.Callable
 

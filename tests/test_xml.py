@@ -12,12 +12,12 @@ class TestSimpleXML(unittest.TestCase):
         # import `Name` and `Space` from $RBNF_HOME/std/common  
         
         XML ::= 
-            | '<' Name as t1 '/' '>'
-            | '<' Name as t1 '>' (XML | ~('<' '/' Name '>'))* as seq '<' '/'  Name as t2 '>'
+            | '<' t1=Name '/' '>'
+            | '<' t1=Name '>' (XML | (seq << ~('<' '/' Name '>')))* '<' '/'  t2=Name '>'
             with
                 't2' not in state.ctx or t1.value == t2.value
             rewrite
-                t1.value, seq if 'seq' in state.ctx else ()
+                t1.value, seq if seq else ()
         """)
 
         print(ze_exp.match('<a> b </a>').result)
