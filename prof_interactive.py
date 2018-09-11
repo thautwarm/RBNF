@@ -2,22 +2,12 @@ import rbnf.zero as ze
 import timeit
 
 ze_exp = ze.compile("""
-[python] import rbnf.std.common.[recover_codes Tokenizer]
+[python] import rbnf.std.common.[recover_codes]
 pattern := R'[^/\sa-z]+'
-url ::= ('https:' | 'http:')   as prefix 
-         '//'                  as slash 
-          pattern+             as head 
-          ('/' pattern)*       as tail 
-          ['/'] 
-          rewrite
-            def stream():
-                yield prefix
-                yield slash
-                yield from head
-                yield from tail
-            stream()
+url ::= (('https:' | 'http:') '//' pattern+ ('/' pattern)* ['/']) as result 
+        -> result
 
-text ::= (url to [urls] | ~url)+
+text ::= (url to [urls]| ~url)+
             rewrite
               tuple(recover_codes(each) for each in urls)
               

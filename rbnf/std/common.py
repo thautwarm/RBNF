@@ -1,5 +1,6 @@
 from Redy.Magic.Classic import cast
-from ..core.ParserC import Literal, Tokenizer
+from ..core.ParserC import Literal
+from ..core.Tokenizer import Tokenizer
 from typing import Iterator
 
 N = Literal.N
