@@ -5,14 +5,14 @@ from ..Result import *
 from ..AST import *
 from Redy.Opt import feature, constexpr, const, goto, label
 from typing import Sequence, List
-import types
 import warnings
 
 staging = (const, constexpr)
 
 
 @Composed.match.case(Composed.AnyNot)
-def _not_match(self: Composed, tokenizers: Sequence[Tokenizer], state: State) -> Result:
+def _not_match(self: Composed, tokenizers: Sequence[Tokenizer],
+               state: State) -> Result:
     which = self[1]
     history = state.commit()
     if which.match(tokenizers, state).status is Unmatched:
@@ -51,13 +51,13 @@ def as_fixed(self, lang):
 
 
 @Composed.match.case(Composed.And)
-def _and_match(self: Composed, tokenizers: Sequence[Tokenizer], state: State) -> Result:
+def _and_match(self: Composed, tokenizers: Sequence[Tokenizer],
+               state: State) -> Result:
     atoms: List[Atom] = self[1]
     history = state.commit()
     nested = Nested()
     nested_extend = nested.extend
     nested_append = nested.append
-    # no tco here, so I have to repeat myself.
     for i in range(len(atoms)):
         atom = atoms[i]
         each_result = atom.match(tokenizers, state)
@@ -72,10 +72,10 @@ def _and_match(self: Composed, tokenizers: Sequence[Tokenizer], state: State) ->
                 nested_append(each_value)
             continue
         else:
-            stacked_func: LRFunc = each_result.value
+            lr_parser, stacked_func = each_result.value
 
-            def stacked_func_(ast: AST):
-                stacked_result: Result = stacked_func(ast)
+            def stacked_func_(ast):
+                stacked_result = stacked_func(ast)
                 if stacked_result.status is Matched:
                     stacked_value = stacked_result.value
                     stacked_nested = nested.copy()
@@ -103,7 +103,7 @@ def _and_match(self: Composed, tokenizers: Sequence[Tokenizer], state: State) ->
                     return Result.match(stacked_nested)
                 return stacked_result
 
-            return Result.find_lr(stacked_func_)
+            return Result.find_lr(lr_parser, stacked_func_)
 
     return Result(Matched, nested)
 
@@ -140,7 +140,7 @@ def as_fixed(self, lang):
                     nested_append(each_value)
                 continue
             else:
-                stacked_func = each_result.value
+                lr_parser, stacked_func = each_result.value
                 match_fns__ = match_fns
 
                 def stacked_func_(ast):
@@ -172,7 +172,7 @@ def as_fixed(self, lang):
                         return Result.match(stacked_nested)
                     return stacked_result
 
-                return constexpr[Result.find_lr](stacked_func_)
+                return constexpr[Result.find_lr](lr_parser, stacked_func_)
 
         return constexpr[Result](constexpr[Matched], nested)
 
@@ -180,7 +180,8 @@ def as_fixed(self, lang):
 
 
 @Composed.match.case(Composed.Or)
-def _or_match(self: Composed, tokenizers: Sequence[Tokenizer], state: State) -> Result:
+def _or_match(self: Composed, tokenizers: Sequence[Tokenizer],
+              state: State) -> Result:
     ors: Sequence[Composed] = self[1]
     history = state.commit()
     for or_ in ors:
@@ -219,7 +220,8 @@ def as_fixed(self, lang):
 
 
 @Composed.match.case(Composed.Seq)
-def _seq_match(self: Composed, tokenizers: Sequence[Tokenizer], state: State) -> Result:
+def _seq_match(self: Composed, tokenizers: Sequence[Tokenizer],
+               state: State) -> Result:
     FINISH = 0
     CONTINUE = 1
     FAIL = 2
@@ -242,7 +244,8 @@ def _seq_match(self: Composed, tokenizers: Sequence[Tokenizer], state: State) ->
             if least is 0:
                 state.reset(history)
                 warnings.warn(
-                    f"Left recursion supporting is ambiguous with repeatable parser({self}) that which couldn't fail.")
+                    f"Left recursion supporting is ambiguous with repeatable parser({self}) that which couldn't fail."
+                )
                 return FAIL
             return sub_res.value
 
@@ -267,15 +270,16 @@ def _seq_match(self: Composed, tokenizers: Sequence[Tokenizer], state: State) ->
                 state.reset(root_history)
             return Result.mismatched
 
-        stacked_func = status
+        lr_parser, stacked_func = status
 
-        def stacked_func_(ast: AST):
+        def stacked_func_(ast):
             now_ = now
             parsed_ = nested.copy()
-            res: Result = stacked_func(ast)
+            res = stacked_func(ast)
 
             if res.status is Unmatched:
-                return Result.mismatched if now_ < least else Result.match(parsed_)
+                return Result.mismatched if now_ < least else Result.match(
+                    parsed_)
 
             now_ += 1
             while True:
@@ -287,7 +291,7 @@ def _seq_match(self: Composed, tokenizers: Sequence[Tokenizer], state: State) ->
                     continue
                 return Result.mismatched
 
-        return Result.find_lr(stacked_func_)
+        return Result.find_lr(lr_parser, stacked_func_)
 
 
 @Composed.as_fixed.case(Composed.Seq)
@@ -338,12 +342,13 @@ def as_fixed(self, lang):
                 if constexpr[least is 0]:
                     state.reset(history)
 
-                    warnings.warn(f"Left recursion supporting is ambiguous with "
-                                  f"repeatable parser({self}) that which couldn't fail.")
+                    warnings.warn(
+                        f"Left recursion supporting is ambiguous with "
+                        f"repeatable parser({self}) that which couldn't fail.")
 
                     label_fail.jump()
 
-                stacked_func = sub_res.value
+                lr_parser, stacked_func = sub_res.value
                 label_lr.jump()
 
             sub_value = sub_res.value
@@ -386,8 +391,9 @@ def as_fixed(self, lang):
                     elif sub_res.status is FindLR:
                         if least_ is 0:
                             state.reset(history)
-                            warnings.warn(f"Left recursion supporting is ambiguous with repeatable parser"
-                                          f"({self}) that which couldn't fail.")
+                            warnings.warn(
+                                f"Left recursion supporting is ambiguous with repeatable parser"
+                                f"({self}) that which couldn't fail.")
                             return FAIL_
                         return sub_res.value
 
@@ -403,7 +409,8 @@ def as_fixed(self, lang):
                 res = stacked_func(ast)
 
                 if res.status is Unmatched:
-                    return Result.mismatched if now_ < least_ else Result.match(parsed_)
+                    return Result.mismatched if now_ < least_ else Result.match(
+                        parsed_)
 
                 now_ += 1
                 while True:
@@ -415,7 +422,7 @@ def as_fixed(self, lang):
                         continue
                     return Result.mismatched
 
-            ret = constexpr[Result.find_lr](stacked_func_)
+            ret = constexpr[Result.find_lr](lr_parser, stacked_func_)
             label_return.mark()
             return ret
 
@@ -423,7 +430,8 @@ def as_fixed(self, lang):
 
 
 @Composed.match.case(Composed.Jump)
-def _jump_match(self: Composed, tokenizers: Sequence[Tokenizer], state: State) -> Result:
+def _jump_match(self: Composed, tokenizers: Sequence[Tokenizer],
+                state: State) -> Result:
     parser_dict: Dict[str, Parser] = self[1]
 
     try:

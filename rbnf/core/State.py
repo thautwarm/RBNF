@@ -1,22 +1,24 @@
-from typing import Optional, Callable
+from typing import Callable, Set, Tuple
 from Redy.Magic.Classic import singleton
 from .Trace import *
 
 Context = 'Dict[str, AST]'
 
 
-@singleton
 class LRManager:
+    __slots__ = ['state', 'record']
     state: 'State'
+    record: Tuple[int, str]
+
+    def __init__(self, state, record):
+        self.state = state
+        self.record = record
 
     def __enter__(self):
-        pass
+        self.state.lr.add(self.record)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.state.lr_name = None
-
-
-LRManager: LRManager
+        self.state.lr.remove(self.record)
 
 
 class ContextRecovery:
@@ -37,7 +39,7 @@ class ContextRecovery:
 class State(Generic[T]):
     trace: Trace[Trace[T]]
     persistent_state: dict
-    lr_name: Optional[str]
+    lr: Set[Tuple[int, str]]
     lang: dict
     ctx: Context
 
@@ -45,9 +47,10 @@ class State(Generic[T]):
 
     def __init__(self, lang, filename=None):
         self.lang = lang
-        self.lr_name = None
+        self.lr = set()
         self.filename = filename
         self.ctx = {}
+
         self.data = None
 
         self.trace = Trace()
@@ -55,9 +58,9 @@ class State(Generic[T]):
 
         self._new_one_factory = Trace
 
-    def left_recursion(self):
-        LRManager.state = self
-        return LRManager
+    def left_recursion(self, lr_record):
+
+        return LRManager(self, lr_record)
 
     def leave_with_context_recovery(self):
         return ContextRecovery(self)

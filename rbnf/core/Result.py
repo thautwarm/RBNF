@@ -40,8 +40,8 @@ class Result:
         return Result(Matched, value)
 
     @staticmethod
-    def find_lr(func) -> 'Result':
-        return Result(FindLR, func)
+    def find_lr(parser, func) -> 'Result':
+        return Result(FindLR, (parser, func))
 
     @staticmethod
     def mismatch():
