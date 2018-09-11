@@ -1,5 +1,5 @@
 from rbnf.bootstrap.rbnf import build_language, Language
-from rbnf.Color import Blue, LightBlue, Purple, Yellow
+from rbnf.color import Blue, LightBlue, Purple, Yellow
 import rbnf.zero as ze
 from wisepy.talking import Talking
 from Redy.Tools.PathLib import Path

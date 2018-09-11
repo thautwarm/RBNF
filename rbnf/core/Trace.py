@@ -1,5 +1,5 @@
 from typing import Sequence, List, Generic, TypeVar
-from ..Color import *
+from ..color import *
 
 T = TypeVar('T')
 

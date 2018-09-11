@@ -67,6 +67,7 @@ def unparse(ast: ast.AST):
 def auto_context(fn):
     return _AutoContext(fn)
 
+
 class OrderedDefaultDict(OrderedDict):
     cons: typing.Callable
 
@@ -114,8 +115,11 @@ def process(fn, bound_names):
     # noinspection PyArgumentList,PyArgumentList
     if isinstance(fn, _FnCodeStr):
 
-        assign_code_str = '{syms} = map(state.ctx.get, {names})'.format(
-            syms=', '.join(bound_names) + ',', names=repr(bound_names))
+        if bound_names:
+            assign_code_str = '{syms} = map(state.ctx.get, {names})'.format(
+                syms=', '.join(bound_names) + ',', names=repr(bound_names))
+        else:
+             assign_code_str = ''
 
         code = "def {0}({1}):\n{2}".format(
             fn.fn_name, ", ".join(fn.fn_args),
@@ -406,7 +410,7 @@ class Language:
 
                 dump_spec[cls.__name__] = list(lexer_spec_maker())
 
-            else:  # Parser
+            else:
 
                 implementation: ParserC.Parser = cls.bnf()
 
@@ -414,7 +418,7 @@ class Language:
 
                 binding_names = tuple(get_binding_names(implementation))
 
-                when, when_ast = _process(cls.when, ())
+                when, when_ast = _process(cls.when, binding_names)
                 fail_if, fail_if_ast = _process(cls.fail_if, binding_names)
                 rewrite, rewrite_ast = _process(cls.rewrite, binding_names)
 
@@ -427,8 +431,8 @@ class Language:
         def name_and_ty(e: LexerFactor):
             return e.name, type(e)
 
-        def merge(e: typing.Tuple[typing.Tuple[str, type], typing.List[
-                LexerFactor]]):
+        def merge(e: typing.Tuple[typing.Tuple[str, type], typing.
+                                  List[LexerFactor]]):
             (lexer_group_name, lexer_ty), members = e
 
             def stream():
@@ -448,8 +452,8 @@ class Language:
 
         # @formatter:off
         # noinspection PyProtectedMember
-        lexer_table = (seq(lexer_factors).chunk_by(name_and_ty).map(merge)
-                       .map(lambda it: it.to_lexer()).to_list()._)
+        lexer_table = (seq(lexer_factors).chunk_by(name_and_ty).map(merge).map(
+            lambda it: it.to_lexer()).to_list()._)
         # @formatter:on
 
         @feature(staging)
@@ -460,8 +464,8 @@ class Language:
         def lexer(text: str):
             ignore_lst: const = self.ignore_lst
             cm: const = cast_map
-            result = constexpr[lexing](text, constexpr[lexer_table], cm
-                                       if constexpr[cm] else None)
+            result = constexpr[lexing](text, constexpr[lexer_table],
+                                       cm if constexpr[cm] else None)
             return filter(constexpr[filter_token],
                           result) if constexpr[ignore_lst] else result
 

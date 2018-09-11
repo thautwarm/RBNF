@@ -1,6 +1,6 @@
 from ..core.Tokenizer import Tokenizer
 from rbnf.core.CachingPool import ConstStrPool
-from ..Color import *
+from ..color import *
 from typing import *
 from Redy.Magic.Pattern import Pattern
 from Redy.Magic.Classic import singleton

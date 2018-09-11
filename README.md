@@ -49,7 +49,7 @@ Preview
 
 
 
-    λ printf "ignore [space]\nspace := R'\s+'\nterm := R'[^\s\(\)]+'\nsexpr ::= '(' sexpr * ')' | term" > lisp.rbnf
+    λ printf "ignore [space]\nspace := R'\s+'\nterm := R'[^\s\(\)]+'\nsexpr ::= '(' sexpr* ')' | term" > lisp.rbnf
     λ rbnf run lisp
 
     type `:i` to switch between python mode and parsing mode.
