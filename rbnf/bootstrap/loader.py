@@ -5,12 +5,14 @@ Any = Atom.Any
 Named = Atom.Named
 Push = Atom.Push
 Bind = Atom.Bind
+Guard = Atom.Guard
 
 AnyNot = Composed.AnyNot
 Jump = Composed.Jump
 And = Composed.And
 Or = Composed.Or
 Seq = Composed.Seq
+
 
 N = Literal.N
 C = Literal.C

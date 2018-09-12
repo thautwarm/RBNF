@@ -27,12 +27,16 @@ class Nested(AST, List[AST]):
 @record
 class Named(AST):
     name: str
-    item: AST
+    content: AST
+
+    @property
+    def item(self):
+        return self.content
 
     def format(self, i=0):
         named_indent_num = i + len(self.name) + 1
         indent = ' ' * i
-        content = format_ast(self.item, named_indent_num)
+        content = format_ast(self.content, named_indent_num)
         return f'{indent}{self.name}[\n{content}\n{indent}]'
 
     def __str__(self):

@@ -30,8 +30,8 @@ class ConstantLexerFactor(typing.NamedTuple):
         return ConstStrPool.cast_to_const(self.name), str_lexer(self.factors)
 
 
-def get_lexer_factors(parser: 'Parser') -> typing.Generator[typing.Union[
-        RegexLexerFactor, ConstantLexerFactor], None, None]:
+def get_lexer_factors(parser: 'Parser') -> typing.Generator[
+        typing.Union[RegexLexerFactor, ConstantLexerFactor], None, None]:
     def for_literal(lit: Literal):
         if lit[0] is Literal.R:
             a, b = lit[1].raw
@@ -47,8 +47,11 @@ def get_lexer_factors(parser: 'Parser') -> typing.Generator[typing.Union[
     def for_atom(atom: Atom):
         if Atom.Bind is atom[0]:
             yield from get_lexer_factors(atom[2])
-        if Atom.Push is atom[0]:
+        elif Atom.Push is atom[0]:
             yield from get_lexer_factors(atom[2])
+        elif atom[0] is Atom.Guard:
+            yield from get_lexer_factors(atom[1])
+
         return
 
     def for_composed(comp: Composed):
@@ -59,6 +62,7 @@ def get_lexer_factors(parser: 'Parser') -> typing.Generator[typing.Union[
             yield from get_lexer_factors(comp[1])
         elif comp[0] is Composed.AnyNot:
             yield from get_lexer_factors(comp[1])
+
         else:
             for each in map(get_lexer_factors, comp[1]):
                 yield from each
@@ -82,6 +86,9 @@ def get_binding_names(parser: 'Parser') -> typing.Generator[str, None, None]:
         elif Atom.Push is atom[0]:
             yield atom[1]
             yield from get_binding_names(atom[2])
+
+        elif atom[0] is Atom.Guard:
+            yield from get_binding_names(atom[1])
 
     def for_composed(comp: Composed):
         if comp[0] is Composed.Jump:
@@ -146,6 +153,10 @@ def dumps(self):
         return f"ruiko.Named({name!r})"
     if tag is Atom.Any:
         return f"ruiko.Any"
+
+    if tag is Atom.Guard:
+        _, parser, fn = self
+        return "ruiko.Guard({}, {})".format(dumps(parser), fn.name)
     raise TypeError(tag)
 
 

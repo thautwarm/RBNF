@@ -418,7 +418,7 @@ class Language:
 
                 binding_names = tuple(get_binding_names(implementation))
 
-                when, when_ast = _process(cls.when, binding_names)
+                when, when_ast = _process(cls.when, ())
                 fail_if, fail_if_ast = _process(cls.fail_if, binding_names)
                 rewrite, rewrite_ast = _process(cls.rewrite, binding_names)
 

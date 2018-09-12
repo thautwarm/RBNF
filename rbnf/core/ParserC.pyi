@@ -98,6 +98,11 @@ class Atom(Parser):
         def __new__(cls, binding_name: str, or_parser: Parser) -> Atom:
             ...
 
+    class Guard(Parser):
+        def __new__(cls, parser: Parser, fn: function) -> Atom:
+            fn.name
+
+
     class Named(Parser):
         def __new__(cls, name: str, when: Optional[When],
                     with_: Optional[With], rewrite: Optional[Rewrite]) -> Atom:
@@ -126,6 +131,8 @@ class Composed(Parser):
     class Jump(Parser):
         def __new__(cls, switch_cases: Dict[lit, Parser]) -> Composed:
             ...
+
+
 
     class AnyNot(Parser):
         def __new__(cls, which: Parser) -> Composed:

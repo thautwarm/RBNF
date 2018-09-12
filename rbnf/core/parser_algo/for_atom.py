@@ -332,7 +332,6 @@ def as_fixed(self, lang):
                         if res.status is constexpr[Unmatched]:
                             break
 
-
                         head = rewrite(
                             state) if constexpr[rewrite] else constexpr[Named](
                                 name, res.value)
@@ -341,6 +340,56 @@ def as_fixed(self, lang):
                 return result
 
     self.match = name_match
+
+
+@Atom.as_fixed.case(Atom.Guard)
+def _guard_as_fixed(self, lang):
+    @feature(staging)
+    def _guard_match(tokenizers: Sequence[Tokenizer], state: State) -> Result:
+        match: const = self[1].match
+        predicate: const = self[2]
+
+        result = match(tokenizers, state)
+        status = result.status
+        if status is constexpr[Matched] or status is constexpr[Unmatched]:
+            if not predicate(state):
+                return constexpr[Result.mismatched]
+            return result
+        lr_parser, stacked_fn_ = result.value
+        predicate_ = predicate
+        matched = Matched
+        mismatched = Result.mismatched
+
+        def stacked_fn(ast):
+            result = stacked_fn_(ast)
+            if result.status is not matched or not predicate_(state):
+                return mismatched
+            return result
+
+        return constexpr[Result.find_lr](lr_parser, stacked_fn)
+
+    return _guard_match
+
+
+@Atom.match.case(Atom.Guard)
+def _guard_match(self, tokenizers: Sequence[Tokenizer],
+                 state: State) -> Result:
+
+    result = self[1].match(tokenizers, state)
+    status = result.status
+    if status is Matched or status is Unmatched:
+        if not self[2](state):
+            return Result.mismatched
+        return result
+    lr_parser, stacked_fn_ = result.value
+
+    def stacked_fn(ast: AST):
+        result = stacked_fn_(ast)
+        if result.status is not Matched or not self[2](state):
+            return Result.mismatched
+        return result
+
+    return Result.find_lr(lr_parser, stacked_fn)
 
 
 @Atom.as_fixed.case(None)

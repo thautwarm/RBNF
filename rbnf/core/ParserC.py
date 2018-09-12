@@ -129,6 +129,7 @@ class Literal(Parser, ConsInd, traits.Dense, traits.Im):
 class Atom(Parser, ConsInd, traits.Dense, traits.Im):
     Bind: lambda name, or_parser: f'({or_parser}) as {name}'
     Push: lambda name, or_parser: f'({or_parser}) to {name}'
+    Guard: lambda parser, fn: f'({parser}){{{fn.name}}}'
     Named: RDT[
         lambda ref_name: [[ConstStrPool.cast_to_const(ref_name)], ref_name]]
     Any: '_'
@@ -154,7 +155,6 @@ class Composed(Parser, ConsInd, traits.Dense, traits.Im):
     Seq: lambda parser, least, most: f'({parser}){{{least} {most}}}'
     Jump: lambda switch_cases: "{{{}}}".format(
         ', '.join(f"({case.__repr__()} => {parser})" for case, parser in switch_cases.items()))
-
     AnyNot: lambda which: f'not {which}'
 
     @Pattern

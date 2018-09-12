@@ -189,7 +189,7 @@ class Trail(Parser):
             | Primitive @ "atom" +
             (C('+') @ "one_or_more"
              | C('*') @ "zero_or_more"
-             | C('{') + Number(1, 2) @ "interval" + C('}')).optional)
+             | C('{') + (Number(1, 2) @ "interval" | Name @ "guard") + C('}')).optional)
 
         left_assign = optimize(Name @ "bind" + C("=")
                                | Name @ "bind" + C("<<") @ "is_seq") + a
@@ -211,6 +211,7 @@ class Trail(Parser):
         interval: Sequence[Tokenizer]
         bind: Tokenizer
         is_seq: object
+        guard: Tokenizer
 
         def delay():
             nonlocal atom
@@ -230,6 +231,11 @@ class Trail(Parser):
                     else:
                         least, most = map(lambda _: int(_.value), interval)
                     return atom.repeat(least, most)
+                if guard:
+                    guard_fn = state.data.namespace[guard.value]
+                    guard_fn.name = guard.value
+                    return _Atom.Guard(atom, guard_fn)
+
                 return atom
 
             ret: Parser = ret()
