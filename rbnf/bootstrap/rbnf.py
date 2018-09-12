@@ -31,6 +31,13 @@ END = N('END')
 PatternName = str
 
 
+def opt(f):
+    def call():
+        return optimize(f())
+
+    return call
+
+
 class _Wild:
     def __contains__(self, item):
         return True
@@ -150,6 +157,7 @@ class Primitive(Parser):
 
         str: Tokenizer = get('str')
 
+        @opt
         def delay():
             nonlocal name
             if name:
@@ -189,7 +197,8 @@ class Trail(Parser):
             | Primitive @ "atom" +
             (C('+') @ "one_or_more"
              | C('*') @ "zero_or_more"
-             | C('{') + (Number(1, 2) @ "interval" | Name @ "guard") + C('}')).optional)
+             | C('{') +
+             (Number(1, 2) @ "interval" | Name @ "guard") + C('}')).optional)
 
         left_assign = optimize(Name @ "bind" + C("=")
                                | Name @ "bind" + C("<<") @ "is_seq") + a
@@ -213,6 +222,7 @@ class Trail(Parser):
         is_seq: object
         guard: Tokenizer
 
+        @opt
         def delay():
             nonlocal atom
             atom = atom()
@@ -263,8 +273,9 @@ class And(Parser):
     def rewrite(cls, state: State):
         and_seq: ParserC.Nested
 
+        @opt
         def delay():
-            return optimize(reduce(operator.add, [each() for each in and_seq]))
+            return reduce(operator.add, [each() for each in and_seq])
 
         return delay
 
@@ -281,12 +292,12 @@ class Or(Parser):
         tail: ParserC.Nested
         head: ParserC.Parser
 
+        @opt
         def delay():
             if not tail:
                 return head()
 
-            return optimize(
-                reduce(operator.or_, [each() for each in tail], head()))
+            return reduce(operator.or_, [each() for each in tail], head())
 
         return delay
 

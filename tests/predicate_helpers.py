@@ -1,6 +1,6 @@
-def is_ok(state):
+def is_ok(_, state):
     return state.end_index < 3
 
 
-def not_ok(state):
+def not_ok(_, state):
     return False

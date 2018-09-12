@@ -351,9 +351,11 @@ def _guard_as_fixed(self, lang):
 
         result = match(tokenizers, state)
         status = result.status
-        if status is constexpr[Matched] or status is constexpr[Unmatched]:
-            if not predicate(state):
+        if status is constexpr[Matched]:
+            if not predicate(result.value, state):
                 return constexpr[Result.mismatched]
+            return result
+        elif status is Unmatched:
             return result
         lr_parser, stacked_fn_ = result.value
         predicate_ = predicate
@@ -362,7 +364,8 @@ def _guard_as_fixed(self, lang):
 
         def stacked_fn(ast):
             result = stacked_fn_(ast)
-            if result.status is not matched or not predicate_(state):
+            if result.status is not matched or not predicate_(
+                    result.value, state):
                 return mismatched
             return result
 
@@ -377,15 +380,18 @@ def _guard_match(self, tokenizers: Sequence[Tokenizer],
 
     result = self[1].match(tokenizers, state)
     status = result.status
-    if status is Matched or status is Unmatched:
-        if not self[2](state):
+    if status is Matched:
+        if not self[2](result.value, state):
             return Result.mismatched
         return result
+    elif status is Unmatched:
+        return result
+
     lr_parser, stacked_fn_ = result.value
 
     def stacked_fn(ast: AST):
         result = stacked_fn_(ast)
-        if result.status is not Matched or not self[2](state):
+        if result.status is not Matched or not self[2](result.value, state):
             return Result.mismatched
         return result
 

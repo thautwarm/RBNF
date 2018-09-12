@@ -1,7 +1,7 @@
 from Redy.Magic.Pattern import Pattern
 from collections import OrderedDict
 from typing import Dict, TypeVar, List, Callable, Iterable
-from .ParserC import Parser, Composed
+from .ParserC import Parser, Composed, Atom
 
 TR = TypeVar('TR')
 T = TypeVar('T')
@@ -30,10 +30,9 @@ def well_group_by(fn):
 
     return inner
 
-
 @Pattern
 def optimize(parser: Parser) -> Parser:
-    return parser[0]
+    return parser[0] if isinstance(parser, Composed) else None
 
 
 @optimize.case(Composed.And)
@@ -80,7 +79,6 @@ def optimize(or_: Composed.Or) -> Parser:
     if len(cases) is 1:
         return cases[0]
     return Composed.Or(cases)
-
 
 @optimize.case(any)
 def optimize(_) -> Parser:
