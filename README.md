@@ -87,10 +87,48 @@ Preview
 Related
 ----------------------
 
-- RBNF could help to develop type checker:
+RBNF is leveraged to handle parsing tasks in some projects. Feel free to check them to get a better knowledge:
 
-   [https://github.com/thautwarm/reFining](https://github.com/thautwarm/reFining])
+- [Yet Another Python Python](https://github.com/Xython/YAPyPy):
+  
+  A Python bytecode compiler to provide custom extended syntaxes and optimization passes.  
+  [This](https://github.com/Xython/YAPyPy/blob/master/yapypy/extended_python/grammar.py) provides a parser for extended Python(compatible to Python 3.6.x-3.8.0). 
+  
+   ```python
+   {"a" : a, "b": {"c": c}} = {"a": 1, "b": {"c": 2, **other2}, **others1}
+   assert a == 1 and c == 2
+   ```
+  
+- [Reley](https://github.com/thautwarm/reley)
+ 
+  A haskell-like language implemented in Python.
+  [This](https://github.com/thautwarm/reley/blob/master/reley/impl/grammar.rbnf) provides a parser for a part of haskell.   
+  
+  ```haskell
+  
+    import operator (add, eq)
+    import functools (reduce)
+    import toolz (curry)
+    import reley.prelude ((+))
 
+    infix 5 (==)
+    infix 0 ($)
+    (==) = curry eq
+    ($) a b = a b
+    (+) = curry add
+
+
+    m_sum lst = if lst == [] then 0
+            else destruct lst
+            where
+                destruct (a, b) = a + m_sum(b)
+  ```
+ 
+
+
+- [ReFining](https://github.com/thautwarm/reFining):
+   
+   A type checker.
    ```
    python cli.py
 
@@ -98,10 +136,11 @@ Related
          fn x: 'a -> x ;;
    =>  (int`2 => int`2)
    ```
+  
 
-- RBNF could help to develop programming languages:
-
-    [https://github.com/thautwarm/rmalt](https://github.com/thautwarm/rmalt)
+- [RMalt](https://github.com/thautwarm/rmalt):
+    
+    A concise demo of intepreter implementation.
 
     ```
     python test.py
